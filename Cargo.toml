@@ -1,0 +1,10 @@
+[package]
+name = "Ana"
+description = "A judger in Rust"
+version = "0.0.1"
+authors = ["hr567 <hr567@hr567.me>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+cgroups = "0.0.2"

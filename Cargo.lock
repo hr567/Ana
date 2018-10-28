@@ -1,0 +1,14 @@
+[[package]]
+name = "Ana"
+version = "0.0.1"
+dependencies = [
+ "cgroups 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "cgroups"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[metadata]
+"checksum cgroups 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "743f864c5eeb0371ed1db54e9db208a3783c5f12400db995fed2d9a9289cf0c3"
