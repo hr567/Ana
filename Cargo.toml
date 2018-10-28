@@ -8,3 +8,4 @@ publish = false
 
 [dependencies]
 cgroups = "0.0.2"
+serde_json = "1.0"
