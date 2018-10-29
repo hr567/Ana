@@ -1,6 +1,8 @@
 {
     "id": 1000,
     "name": "Example A+B Problem",
+    "source_filename": "main",
+    "executable_filename": "main",
     "input_filename": "example.in",
     "output_filename": "example.out",
     "time_limit": 1.0,
