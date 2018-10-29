@@ -44,8 +44,8 @@ impl Problem {
         }
     }
 
-    pub fn from_json(json: &String) -> Self {
-        serde_json::from_str(json.as_str()).expect("Fail to deserialize json")
+    pub fn from_json(json: &str) -> Self {
+        serde_json::from_str(json).expect("Fail to deserialize json")
     }
 
     pub fn to_json(&self) -> String {
