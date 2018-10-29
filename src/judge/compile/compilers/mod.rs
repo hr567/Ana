@@ -3,6 +3,8 @@ pub mod cpp_gxx;
 
 use std::path::Path;
 
+pub type CompileResult = Result<(), ()>;
+
 pub enum Languages {
     CGcc,
     CppGxx,
@@ -15,5 +17,5 @@ pub trait Compiler {
         source_file: &Path,
         executable_file: &Path,
         optimize_flag: bool,
-    ) -> Result<(), ()>;
+    ) -> CompileResult;
 }

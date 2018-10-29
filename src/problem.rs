@@ -1,12 +1,12 @@
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct TestCase {
     input: String,
     answer: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Problem {
     pub id: u64,
     pub name: String,
@@ -60,5 +60,66 @@ impl Problem {
 
     pub fn test_case_count(&self) -> usize {
         self.test_cases.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serialize() {
+        let json_problem: &str = r#"{"id":1000,"name":"Example A+B Problem","source_filename":"main","executable_filename":"main","input_filename":"example.in","output_filename":"example.out","time_limit":1.0,"memory_limit":128.0,"stdio":true,"optimize":true,"test_cases":[{"input":"1 1","answer":"2"},{"input":"13 5\n14 7\n23 45","answer":"18\n21\n68"}]}"#;
+        let problem = Problem::new(
+            1000,
+            String::from("Example A+B Problem"),
+            String::from("main"),
+            String::from("main"),
+            String::from("example.in"),
+            String::from("example.out"),
+            1.0,
+            128.0,
+            true,
+            true,
+            vec![
+                TestCase {
+                    input: String::from("1 1"),
+                    answer: String::from("2"),
+                },
+                TestCase {
+                    input: String::from("13 5\n14 7\n23 45"),
+                    answer: String::from("18\n21\n68"),
+                },
+            ],
+        );
+        assert_eq!(problem.to_json().as_str(), json_problem);
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let json_problem: &str = r#"{"id":1000,"name":"Example A+B Problem","source_filename":"main","executable_filename":"main","input_filename":"example.in","output_filename":"example.out","time_limit":1.0,"memory_limit":128.0,"stdio":true,"optimize":true,"test_cases":[{"input":"1 1","answer":"2"},{"input":"13 5\n14 7\n23 45","answer":"18\n21\n68"}]}"#;
+        let problem = Problem::new(
+            1000,
+            String::from("Example A+B Problem"),
+            String::from("main"),
+            String::from("main"),
+            String::from("example.in"),
+            String::from("example.out"),
+            1.0,
+            128.0,
+            true,
+            true,
+            vec![
+                TestCase {
+                    input: String::from("1 1"),
+                    answer: String::from("2"),
+                },
+                TestCase {
+                    input: String::from("13 5\n14 7\n23 45"),
+                    answer: String::from("18\n21\n68"),
+                },
+            ],
+        );
+        assert_eq!(Problem::from_json(json_problem), problem);
     }
 }
