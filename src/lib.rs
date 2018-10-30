@@ -6,4 +6,5 @@ extern crate serde_derive;
 
 pub mod compiler;
 pub mod judge;
+pub mod launcher;
 pub mod problem;
