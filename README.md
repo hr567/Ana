@@ -1,4 +1,4 @@
 Ana Project
 ===========
 
-A judger for ACM.
+A judge for ACM.
