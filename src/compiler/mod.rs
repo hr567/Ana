@@ -1,23 +1,35 @@
-mod compilers;
+mod back_ends;
 
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-pub use self::compilers::Languages;
-use self::compilers::{CompileResult, Compiler};
+pub type CompileResult = Result<(), ()>;
+
+pub enum Languages {
+    CGcc,
+    CppGxx,
+}
+
+pub trait Compiler {
+    fn suffix(&self) -> &'static str;
+    fn compile(
+        &self,
+        source_file: &Path,
+        executable_file: &Path,
+        optimize_flag: bool,
+    ) -> CompileResult;
+}
 
 pub fn compile(language: &Languages, source_code: &str, executable_file: &Path) -> CompileResult {
     match language {
-        Languages::CGcc => {
-            use self::compilers::c_gcc::CGcc;
-            _compile(CGcc::new(), source_code, executable_file)
-        }
-        Languages::CppGxx => {
-            use self::compilers::cpp_gxx::CppGxx;
-            _compile(CppGxx::new(), source_code, executable_file)
-        }
+        Languages::CGcc => _compile(back_ends::c_gcc::CGcc::new(), source_code, executable_file),
+        Languages::CppGxx => _compile(
+            back_ends::cpp_gxx::CppGxx::new(),
+            source_code,
+            executable_file,
+        ),
     }
 }
 
@@ -84,7 +96,7 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("c_compiler_compile_test.exe");
         let compile_result = _compile(
-            compilers::c_gcc::CGcc::new(),
+            back_ends::c_gcc::CGcc::new(),
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
@@ -101,7 +113,7 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("cpp_compiler_compile_test.exe");
         let compile_result = _compile(
-            compilers::cpp_gxx::CppGxx::new(),
+            back_ends::cpp_gxx::CppGxx::new(),
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
