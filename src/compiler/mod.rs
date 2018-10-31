@@ -12,7 +12,7 @@ pub enum Languages {
     CppGxx,
 }
 
-pub trait Compiler {
+trait Compiler {
     fn suffix(&self) -> &'static str;
     fn compile(
         &self,

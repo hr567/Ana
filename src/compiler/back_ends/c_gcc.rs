@@ -1,7 +1,7 @@
 use std::path::Path;
-
-use super::super::{CompileResult, Compiler};
 use std::process::Command;
+
+use super::{CompileResult, Compiler};
 
 pub struct CGcc {}
 
