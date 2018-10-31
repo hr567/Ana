@@ -34,9 +34,9 @@ impl Compiler for CGcc {
             .status()
             .expect("Failed to compile the source");
         if status.success() {
-            Ok(())
+            CompileResult::Pass
         } else {
-            Err(())
+            CompileResult::CE
         }
     }
 }
@@ -76,7 +76,7 @@ mod tests {
                 executable_file_path.as_path(),
                 true,
             ),
-            Ok(())
+            CompileResult::Pass
         );
     }
 
@@ -100,7 +100,7 @@ mod tests {
                 executable_file_path.as_path(),
                 true,
             ),
-            Err(())
+            CompileResult::CE
         );
     }
 }

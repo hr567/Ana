@@ -2,7 +2,9 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
-use super::Launcher;
+use super::{LaunchResult, Launcher, Limit};
+
+use self::LaunchResult::Pass;
 
 struct DefaultLauncher<'a> {
     executable_file: &'a Path,
@@ -19,7 +21,7 @@ impl<'a> DefaultLauncher<'a> {
 }
 
 impl<'a> Launcher for DefaultLauncher<'a> {
-    fn run(&self) -> Output {
+    fn run(&self) -> LaunchResult {
         let mut child = Command::new(self.executable_file)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -35,7 +37,8 @@ impl<'a> Launcher for DefaultLauncher<'a> {
         let output = child
             .wait_with_output()
             .expect("Failed to wait on child with output");
-        output
+
+        Pass(output)
     }
 }
 
@@ -46,7 +49,10 @@ mod tests {
     #[test]
     fn test_default_launcher() {
         let launcher = DefaultLauncher::new(Path::new("/bin/bash"), &"echo hello world");
-        let output = launcher.run();
-        assert_eq!(output.stdout.as_slice(), "hello world\n".as_bytes());
+        let res = launcher.run();
+        match res {
+            Pass(output) => assert_eq!(output.stdout.as_slice(), "hello world\n".as_bytes()),
+            _ => panic!("Failed when execute program"),
+        }
     }
 }

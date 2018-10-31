@@ -2,17 +2,25 @@ mod back_ends;
 
 use std::process::Output;
 
-trait Launcher {
-    fn run(&self) -> Output;
+#[derive(PartialEq, Debug)]
+pub enum LaunchResult {
+    Pass(Output),
+    TLE,
+    MLE,
+    RE,
 }
 
-struct Limit {
+trait Launcher {
+    fn run(&self) -> LaunchResult;
+}
+
+pub struct Limit {
     time: f64,
     memory: f64,
 }
 
 impl Limit {
-    fn new(time: f64, memory: f64) -> Self {
+    pub fn new(time: f64, memory: f64) -> Self {
         Limit { time, memory }
     }
 }

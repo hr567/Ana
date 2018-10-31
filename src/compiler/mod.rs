@@ -5,7 +5,11 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-pub type CompileResult = Result<(), ()>;
+#[derive(PartialEq, Debug)]
+pub enum CompileResult {
+    Pass,
+    CE,
+}
 
 pub enum Languages {
     CGcc,
@@ -66,7 +70,7 @@ mod tests {
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
-        assert_eq!(compile_result, Ok(()));
+        assert_eq!(compile_result, CompileResult::Pass);
 
         let exit_status = Command::new(executable_file_path.to_str().unwrap())
             .status()
@@ -83,7 +87,7 @@ mod tests {
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
-        assert_eq!(compile_result, Ok(()));
+        assert_eq!(compile_result, CompileResult::Pass);
 
         let exit_status = Command::new(executable_file_path.to_str().unwrap())
             .status()
@@ -100,7 +104,7 @@ mod tests {
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
-        assert_eq!(compile_result, Ok(()));
+        assert_eq!(compile_result, CompileResult::Pass);
 
         let exit_status = Command::new(executable_file_path.to_str().unwrap())
             .status()
@@ -117,7 +121,7 @@ mod tests {
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
-        assert_eq!(compile_result, Ok(()));
+        assert_eq!(compile_result, CompileResult::Pass);
 
         let exit_status = Command::new(executable_file_path.to_str().unwrap())
             .status()
