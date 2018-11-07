@@ -6,6 +6,13 @@ pub struct TestCase {
     pub answer: String,
 }
 
+// TODO: Add support for other kinds of problem
+enum JudgeType {
+    Normal,
+    Special,
+    Interactional,
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Problem {
     pub id: u64,
@@ -50,12 +57,12 @@ impl Problem {
         }
     }
 
-    pub fn from_json(json: &str) -> Self {
-        serde_json::from_str(json).expect("Fail to deserialize json")
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("Fail to serialize the problem")
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
     pub fn test_case_count(&self) -> usize {
@@ -92,7 +99,7 @@ mod tests {
                 },
             ],
         );
-        assert_eq!(problem.to_json().as_str(), json_problem);
+        assert_eq!(problem.to_json().unwrap().as_str(), json_problem);
     }
 
     #[test]
@@ -120,6 +127,6 @@ mod tests {
                 },
             ],
         );
-        assert_eq!(Problem::from_json(json_problem), problem);
+        assert_eq!(Problem::from_json(json_problem).unwrap(), problem);
     }
 }
