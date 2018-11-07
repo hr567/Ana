@@ -16,6 +16,14 @@ pub enum Languages {
     CppGxx,
 }
 
+pub fn get_language(language: &str) -> Languages {
+    match language {
+        "c.gcc" => Languages::CGcc,
+        "cpp.gxx" => Languages::CppGxx,
+        _ => unimplemented!("Language or compiler {} is not support", language),
+    }
+}
+
 trait Compiler {
     fn suffix(&self) -> &'static str;
     fn compile(
