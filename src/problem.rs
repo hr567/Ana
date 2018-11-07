@@ -2,8 +2,8 @@ use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct TestCase {
-    input: String,
-    answer: String,
+    pub input: String,
+    pub answer: String,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
