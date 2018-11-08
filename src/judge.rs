@@ -39,21 +39,26 @@ pub fn judge(
 
         res
     };
-    executable_file.set_file_name(filename);
+    executable_file.push(filename);
     executable_file.set_extension("exe");
 
     match compile(language, source_code, &executable_file) {
-        CompileResult::Pass => {}
-        CompileResult::CE => sender.send(JudgeResult::CE).unwrap(),
-    };
+        CompileResult::Pass => {
+            for test_case in &problem.test_cases {
+                let launcher = Launcher::new();
+                let judge_result = judge_per_test_case(&launcher, &executable_file, test_case);
+                sender
+                    .send(judge_result)
+                    .expect("Cannot send the result to receiver");
+                // use std::{thread::sleep, time::Duration};
+                // sleep(Duration::from_secs(2));
+            }
+        }
 
-    for test_case in &problem.test_cases {
-        let launcher = Launcher::new();
-        let judge_result = judge_per_test_case(&launcher, &executable_file, test_case);
-        sender
-            .send(judge_result)
-            .expect("Cannot send the result to receiver");
-    }
+        CompileResult::CE => {
+            sender.send(JudgeResult::CE).unwrap();
+        }
+    };
 }
 
 fn judge_per_test_case(

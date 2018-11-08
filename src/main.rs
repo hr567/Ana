@@ -57,45 +57,55 @@ fn main() {
         Problem::from_json(problem_json.as_str()).expect("The problem is invalid")
     };
 
-    let (sender, receiver) = mpsc::channel();
+    let (sender, receiver) = mpsc::channel::<JudgeResult>();
 
-    spawn(move || {
+    let handler = spawn(move || {
         use self::JudgeResult::*;
 
         let context = zmq::Context::new();
         let socket = context.socket(&zmq::SocketType::REQ);
-        socket.connect("tcp://localhost:8800").unwrap();
+        socket
+            .connect("tcp://127.0.0.1:8800")
+            .expect("Cannot connect to server");
 
-        for _ in 0.. {
-            match receiver.recv() {
-                Ok(result) => match result {
-                    CE => {
-                        socket.msg_send(zmq::Message::new(), 0).unwrap();
-                    }
-                    AC => {
-                        socket.msg_send(zmq::Message::new(), 0).unwrap();
-                    }
-                    WA => {
-                        socket.msg_send(zmq::Message::new(), 0).unwrap();
-                    }
-                    TLE => {
-                        socket.msg_send(zmq::Message::new(), 0).unwrap();
-                    }
-                    MLE => {
-                        socket.msg_send(zmq::Message::new(), 0).unwrap();
-                    }
-                    RE => {
-                        socket.msg_send(zmq::Message::new(), 0).unwrap();
-                    }
-                },
-                Err(_) => {
-                    break;
+        for (i, res) in receiver.iter().enumerate() {
+            match res {
+                CE => {
+                    socket
+                        .msg_send(zmq::Message::from(format!("#{} CE", i).as_str()), 0)
+                        .unwrap();
+                }
+                AC => {
+                    socket
+                        .msg_send(zmq::Message::from(format!("#{} AC", i).as_str()), 0)
+                        .unwrap();
+                }
+                WA => {
+                    socket
+                        .msg_send(zmq::Message::from(format!("#{} WA", i).as_str()), 0)
+                        .unwrap();
+                }
+                TLE => {
+                    socket
+                        .msg_send(zmq::Message::from(format!("#{} TLE", i).as_str()), 0)
+                        .unwrap();
+                }
+                MLE => {
+                    socket
+                        .msg_send(zmq::Message::from(format!("#{} MLE", i).as_str()), 0)
+                        .unwrap();
+                }
+                RE => {
+                    socket
+                        .msg_send(zmq::Message::from(format!("#{} RE", i).as_str()), 0)
+                        .unwrap();
                 }
             }
+            socket.recv(0, 0).unwrap();
         }
     });
 
     judge(&language, &source_code, &problem, sender);
 
-    println!("Hello, world!");
+    handler.join().unwrap();
 }
