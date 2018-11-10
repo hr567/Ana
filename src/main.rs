@@ -2,15 +2,24 @@ use std::fs::read_to_string;
 use std::sync::mpsc;
 use std::thread::spawn;
 
-extern crate Ana;
+#[macro_use]
+extern crate serde_derive;
+
 extern crate clap;
+extern crate rand;
+extern crate serde;
+extern crate serde_json;
 extern crate zmq;
 
-use Ana::{
-    compiler::get_language,
-    judge::{judge, JudgeResult},
-    problem::Problem,
-};
+pub mod compare;
+pub mod compiler;
+pub mod judge;
+pub mod launcher;
+pub mod problem;
+
+use self::compiler::get_language;
+use self::judge::{judge, JudgeResult};
+use self::problem::Problem;
 
 fn main() {
     let cli_matches = clap::App::new("Ana Judge")
@@ -57,55 +66,53 @@ fn main() {
         Problem::from_json(problem_json.as_str()).expect("The problem is invalid")
     };
 
-    let (sender, receiver) = mpsc::channel::<JudgeResult>();
+    let (sender, receiver) = mpsc::sync_channel::<JudgeResult>(1);
 
-    let handler = spawn(move || {
-        use self::JudgeResult::*;
-
-        let context = zmq::Context::new();
-        let socket = context.socket(&zmq::SocketType::REQ);
-        socket
-            .connect("tcp://127.0.0.1:8800")
-            .expect("Cannot connect to server");
-
-        for (i, res) in receiver.iter().enumerate() {
-            match res {
-                CE => {
-                    socket
-                        .msg_send(zmq::Message::from(format!("#{} CE", i).as_str()), 0)
-                        .unwrap();
-                }
-                AC => {
-                    socket
-                        .msg_send(zmq::Message::from(format!("#{} AC", i).as_str()), 0)
-                        .unwrap();
-                }
-                WA => {
-                    socket
-                        .msg_send(zmq::Message::from(format!("#{} WA", i).as_str()), 0)
-                        .unwrap();
-                }
-                TLE => {
-                    socket
-                        .msg_send(zmq::Message::from(format!("#{} TLE", i).as_str()), 0)
-                        .unwrap();
-                }
-                MLE => {
-                    socket
-                        .msg_send(zmq::Message::from(format!("#{} MLE", i).as_str()), 0)
-                        .unwrap();
-                }
-                RE => {
-                    socket
-                        .msg_send(zmq::Message::from(format!("#{} RE", i).as_str()), 0)
-                        .unwrap();
-                }
-            }
-            socket.recv(0, 0).unwrap();
-        }
+    spawn(move || {
+        judge(&language, &source_code, &problem, sender);
     });
 
-    judge(&language, &source_code, &problem, sender);
+    use self::JudgeResult::*;
 
-    handler.join().unwrap();
+    let context = zmq::Context::new();
+    let socket = context.socket(&zmq::SocketType::REQ);
+    socket
+        .connect("tcp://127.0.0.1:8800")
+        .expect("Cannot connect to server");
+
+    for (i, res) in receiver.iter().enumerate() {
+        match res {
+            CE => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} CE", i).as_str()), 0)
+                    .unwrap();
+            }
+            AC => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} AC", i).as_str()), 0)
+                    .unwrap();
+            }
+            WA => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} WA", i).as_str()), 0)
+                    .unwrap();
+            }
+            TLE => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} TLE", i).as_str()), 0)
+                    .unwrap();
+            }
+            MLE => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} MLE", i).as_str()), 0)
+                    .unwrap();
+            }
+            RE => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} RE", i).as_str()), 0)
+                    .unwrap();
+            }
+        }
+        socket.recv(0, 0).unwrap();
+    }
 }

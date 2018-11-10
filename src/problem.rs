@@ -1,16 +1,11 @@
+// TODO: Add support for other kinds of problem
+
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct TestCase {
     pub input: String,
     pub answer: String,
-}
-
-// TODO: Add support for other kinds of problem
-enum JudgeType {
-    Normal,
-    Special,
-    Interactional,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

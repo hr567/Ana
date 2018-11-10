@@ -1,5 +1,5 @@
 [package]
-name = "Ana"
+name = "ana"
 description = "A judge in Rust"
 version = "0.0.1"
 authors = ["hr567 <hr567@hr567.me>"]
@@ -7,7 +7,6 @@ edition = "2018"
 publish = false
 
 [dependencies]
-cgroups = "0.0.2"
 clap = "2.32"
 rand = "0.5.5"
 serde = "1.0"

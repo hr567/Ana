@@ -8,7 +8,7 @@ use rand::prelude::*;
 use super::{
     compare::{compare, CompareResult},
     compiler::{compile, CompileResult, Languages},
-    launcher::{LaunchResult, Launcher},
+    launcher::{LaunchResult, Launcher, Limit},
     problem::{Problem, TestCase},
 };
 
@@ -25,7 +25,7 @@ pub fn judge(
     language: &Languages,
     source_code: &str,
     problem: &Problem,
-    sender: sync::mpsc::Sender<JudgeResult>,
+    sender: sync::mpsc::SyncSender<JudgeResult>,
 ) {
     let mut executable_file = temp_dir();
     let filename = {
@@ -45,13 +45,13 @@ pub fn judge(
     match compile(language, source_code, &executable_file) {
         CompileResult::Pass => {
             for test_case in &problem.test_cases {
+                let limit = Limit::new(problem.time_limit, problem.memory_limit);
                 let launcher = Launcher::new();
-                let judge_result = judge_per_test_case(&launcher, &executable_file, test_case);
+                let judge_result =
+                    judge_per_test_case(&launcher, &executable_file, test_case, &limit);
                 sender
                     .send(judge_result)
                     .expect("Cannot send the result to receiver");
-                // use std::{thread::sleep, time::Duration};
-                // sleep(Duration::from_secs(2));
             }
         }
 
@@ -65,8 +65,9 @@ fn judge_per_test_case(
     launcher: &Launcher,
     executable_file: &Path,
     test_case: &TestCase,
+    limit: &Limit,
 ) -> JudgeResult {
-    match launcher.run(executable_file, test_case.input.as_str()) {
+    match launcher.run(executable_file, test_case.input.as_str(), limit) {
         LaunchResult::Pass(output) => match compare(
             String::from_utf8(output.stdout).unwrap().as_str(),
             test_case.answer.as_str(),
