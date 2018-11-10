@@ -1,69 +1,53 @@
-use std::fs::read_to_string;
+use std::env;
 use std::sync::mpsc;
 use std::thread::spawn;
 
 #[macro_use]
 extern crate serde_derive;
 
-extern crate clap;
 extern crate rand;
 extern crate serde;
 extern crate serde_json;
 extern crate zmq;
 
-pub mod compare;
-pub mod compiler;
-pub mod judge;
-pub mod launcher;
-pub mod problem;
+mod compare;
+mod compiler;
+mod judge;
+mod launcher;
+mod mtp;
 
 use self::compiler::get_language;
 use self::judge::{judge, JudgeResult};
-use self::problem::Problem;
+use self::mtp::JudgeInfo;
 
 fn main() {
-    let cli_matches = clap::App::new("Ana Judge")
-        .version("0.0.1")
-        .author("hr567 <hr567@hr567.me>")
-        .about("A judge for ACM")
-        .arg(
-            clap::Arg::with_name("language")
-                .short("l")
-                .long("language")
-                .value_name("language")
-                .required(true)
-                .help("The language of the source file")
-                .takes_value(true),
+    let context = zmq::Context::new();
+    let socket = context.socket(&zmq::SocketType::REP);
+    socket
+        .bind(
+            format!(
+                "tcp://{}:{}",
+                match env::var("ANA_ADDRESS") {
+                    Ok(address) => address,
+                    Err(_) => String::from("127.0.0.1"),
+                },
+                match env::var("ANA_PORT") {
+                    Ok(port) => port,
+                    Err(_) => String::from("8800"),
+                }
+            )
+            .as_str(),
         )
-        .arg(
-            clap::Arg::with_name("source")
-                .short("i")
-                .long("source")
-                .value_name("source_file")
-                .required(true)
-                .help("The path of the source file")
-                .takes_value(true),
-        )
-        .arg(
-            clap::Arg::with_name("problem")
-                .short("p")
-                .long("problem")
-                .value_name("problem_file")
-                .required(true)
-                .help("The path of the problem file")
-                .takes_value(true),
-        )
-        .get_matches();
+        .expect("Cannot bind");
 
-    let language = cli_matches.value_of("language").unwrap();
-    let source_file = cli_matches.value_of("source").unwrap();
-    let problem_file = cli_matches.value_of("problem").unwrap();
-
-    let language = get_language(language);
-    let source_code = read_to_string(source_file).expect("Cannot read the source file");
-    let problem = {
-        let problem_json = read_to_string(problem_file).expect("Cannot read the problem file");
-        Problem::from_json(problem_json.as_str()).expect("The problem is invalid")
+    let (language, source_code, problem) = {
+        let judge_info = JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
+            .expect("JudgeInfo is invalid");
+        (
+            get_language(&judge_info.language),
+            judge_info.source,
+            judge_info.problem,
+        )
     };
 
     let (sender, receiver) = mpsc::sync_channel::<JudgeResult>(1);
@@ -73,12 +57,6 @@ fn main() {
     });
 
     use self::JudgeResult::*;
-
-    let context = zmq::Context::new();
-    let socket = context.socket(&zmq::SocketType::REQ);
-    socket
-        .connect("tcp://127.0.0.1:8800")
-        .expect("Cannot connect to server");
 
     for (i, res) in receiver.iter().enumerate() {
         match res {

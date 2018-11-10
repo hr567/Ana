@@ -1,0 +1,23 @@
+{
+    "language": "cpp.gxx",
+    "source": "#include <iostream>\nusing namespace std;\nint main() { int a, b; while (cin >> a >> b) { cout << a + b << endl; } return 0; }",
+    "problem": {
+        "time_limit": 1.0,
+        "memory_limit": 128.0,
+        "optimize": true,
+        "test_cases": [
+            {
+                "input": "1 1",
+                "answer": "2"
+            },
+            {
+                "input": "13 5\n14 7\n23 45",
+                "answer": "18\n21\n68"
+            },
+            {
+                "input": "24 3\n17 -5\n123 945",
+                "answer": "27\n12\n1068"
+            }
+        ]
+    }
+}

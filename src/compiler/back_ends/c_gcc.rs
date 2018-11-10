@@ -62,7 +62,6 @@ mod tests {
         let mut source_file_path = env::temp_dir();
         source_file_path.push("c_compiler_test_pass.c");
 
-        println!("{}", source_file_path.to_str().unwrap());
         let mut source_file = File::create(source_file_path.as_path()).unwrap();
         source_file.write(b"int main() { return 0; }\n\n").unwrap();
         source_file.flush().unwrap();

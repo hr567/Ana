@@ -9,7 +9,7 @@ use super::{
     compare::{compare, CompareResult},
     compiler::{compile, CompileResult, Languages},
     launcher::{LaunchResult, Launcher, Limit},
-    problem::{Problem, TestCase},
+    mtp::{Problem, TestCase},
 };
 
 pub enum JudgeResult {
