@@ -18,7 +18,7 @@ RUN apt-get update && \
     libclang-dev \
     clang && \
     cd /Ana && \
-    cargo +nightly build --release
+    cargo build --release
 
 FROM ubuntu:18.04
 COPY --from=build_lrun /lrun/src/lrun /usr/local/bin
