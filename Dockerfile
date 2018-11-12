@@ -28,7 +28,7 @@ RUN groupadd -r -g 593 lrun && \
     useradd ana && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-    libseccomp-dev && \
+    libseccomp-dev \
     libzmq3-dev && \
     apt-get clean
 EXPOSE 8800
