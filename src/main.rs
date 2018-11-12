@@ -85,6 +85,11 @@ fn main() {
                     .msg_send(zmq::Message::from(format!("#{} MLE", i).as_str()), 0)
                     .unwrap();
             }
+            OLE => {
+                socket
+                    .msg_send(zmq::Message::from(format!("#{} OLE", i).as_str()), 0)
+                    .unwrap();
+            }
             RE => {
                 socket
                     .msg_send(zmq::Message::from(format!("#{} RE", i).as_str()), 0)
