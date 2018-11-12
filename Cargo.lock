@@ -455,7 +455,7 @@ dependencies = [
 [[package]]
 name = "zmq"
 version = "0.0.1"
-source = "git+https://gitlab.com/hr567/rust-zmq.git#ffd3bd7a85748f4d71d97eaf3fe3834df62cfc40"
+source = "git+https://gitlab.com/hr567/rust-zmq.git#a0da6b53a7f20c8be873d8ab5362171449a1ee86"
 dependencies = [
  "bindgen 0.43.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
