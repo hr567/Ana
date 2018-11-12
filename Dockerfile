@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:16.04 AS build_lrun
 COPY /externals/lrun /lrun
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -8,7 +8,7 @@ RUN apt-get update && \
     rake \
     g++ && \
     cd /lrun && \
-    make install
+    make
 
 FROM rustlang/rust:nightly-slim AS build_ana
 COPY / /Ana
@@ -21,12 +21,13 @@ RUN apt-get update && \
     cargo +nightly build --release
 
 FROM ubuntu:18.04
+COPY --from=build_lrun /lrun/src/lrun /usr/local/bin
+COPY --from=build_ana /Ana/target/release/ana /usr/local/bin
 RUN groupadd -r -g 593 lrun && \
+    chown root:lrun /usr/local/bin/lrun && \
     useradd ana && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     libseccomp-dev
-COPY --from=build_lrun /lrun/src/lrun /usr/local/bin
-COPY --from=build_ana /Ana/target/release/ana /usr/local/bin
 EXPOSE 8800
 CMD [ "ana" ]
