@@ -27,28 +27,20 @@ fn main() {
         .bind(
             format!(
                 "tcp://{}:{}",
-                match env::var("ANA_ADDRESS") {
-                    Ok(address) => address,
-                    Err(_) => String::from("127.0.0.1"),
-                },
-                match env::var("ANA_PORT") {
-                    Ok(port) => port,
-                    Err(_) => String::from("8800"),
-                }
+                env::var("ANA_ADDRESS").unwrap_or(String::from("0.0.0.0")),
+                env::var("ANA_PORT").unwrap_or(String::from("8800"))
             )
             .as_str(),
         )
         .expect("Cannot bind");
 
-    let (language, source_code, problem) = {
-        let judge_info = JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
-            .expect("JudgeInfo is invalid");
-        (
-            get_language(&judge_info.language),
-            judge_info.source,
-            judge_info.problem,
-        )
-    };
+    let judge_info = JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
+        .expect("JudgeInfo is invalid");
+    let (language, source_code, problem) = (
+        get_language(&judge_info.language),
+        judge_info.source,
+        judge_info.problem,
+    );
 
     let (sender, receiver) = mpsc::sync_channel::<JudgeResult>(1);
 

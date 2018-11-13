@@ -39,7 +39,7 @@ pub struct LrunResult {
     pub memory: u64,    // Bytes
     pub cpu_time: f64,  // Seconds
     pub real_time: f64, // Seconds
-    pub signaled: bool,
+    pub signaled: i32,
     pub exit_code: i32,
     pub term_sig: i32,
     pub exceed: LrunExceed,
@@ -55,18 +55,19 @@ fn load_lrun_log(lrun_log_path: &Path) -> LrunResult {
         res
     };
     let lrun_result: Vec<&str> = lrun_log
+        .trim()
         .split("\n")
-        .map(|s| s.split(" ").collect::<Vec<&str>>()[1])
+        .map(|s| s.trim().split_whitespace().collect::<Vec<&str>>()[1])
         .collect();
 
     LrunResult {
         memory: lrun_result[0].parse().unwrap(),
         cpu_time: lrun_result[1].parse().unwrap(),
-        real_time: lrun_result[1].parse().unwrap(),
-        signaled: lrun_result[1].parse().unwrap(),
-        exit_code: lrun_result[1].parse().unwrap(),
-        term_sig: lrun_result[1].parse().unwrap(),
-        exceed: match lrun_result[1] {
+        real_time: lrun_result[2].parse().unwrap(),
+        signaled: lrun_result[3].parse().unwrap(),
+        exit_code: lrun_result[4].parse().unwrap(),
+        term_sig: lrun_result[5].parse().unwrap(),
+        exceed: match lrun_result[6] {
             "none" => LrunExceed::Pass,
             "CPU_TIME" => LrunExceed::CpuTime,
             "REAL_TIME" => LrunExceed::RealTime,
@@ -91,11 +92,12 @@ pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResul
     lrun_log.push(filename);
     lrun_log.set_extension("log");
 
-    let mut child = Command::new("bash")
+    let mut child = Command::new("sudo")
+        .arg("bash")
         .arg("-c")
         .arg(format!(
             "{} --max-cpu-time {} --max-real-time {} --max-memory {} --network false {} 3> {}",
-            "lrun --uid 1000 --gid 100",
+            "lrun --uid 65534 --gid 65534", // 65534 is the id of nobody on my computer
             limit.time,
             limit.time + 0.1,
             limit.memory * 1024.0 * 1024.0,
@@ -115,7 +117,7 @@ pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResul
         .expect("Failed to write to stdin");
 
     if let Ok(output) = child.wait_with_output() {
-        assert!(output.status.success(), ("lrun crashed! Why?"));
+        assert!(output.status.success(), "lrun crashed! Why?");
         let lrun_result = load_lrun_log(&lrun_log);
         match lrun_result.exceed {
             LrunExceed::Pass => {
@@ -156,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_memory_limit() {
-        unimplemented!("How to test memory")
+        unimplemented!("TODO: How to test memory")
     }
 
     #[test]

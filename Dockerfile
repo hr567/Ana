@@ -1,5 +1,5 @@
 FROM ubuntu:16.04 AS build_lrun
-COPY /externals/lrun /lrun
+COPY externals/lrun /lrun
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     sudo \
@@ -11,14 +11,15 @@ RUN apt-get update && \
     make
 
 FROM rustlang/rust:nightly-slim AS build_ana
-COPY / /Ana
+COPY Cargo.toml Cargo.lock /Ana/
+COPY src/ /Ana/src
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
     libclang-dev \
     clang && \
     cd /Ana && \
-    cargo build --release
+    cargo build -v --release
 
 FROM ubuntu:18.04
 COPY --from=build_lrun /lrun/src/lrun /usr/local/bin
@@ -28,6 +29,7 @@ RUN groupadd -r -g 593 lrun && \
     useradd ana && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
+    sudo \
     libseccomp-dev \
     libzmq3-dev && \
     apt-get clean
