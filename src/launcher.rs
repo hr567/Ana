@@ -172,4 +172,12 @@ mod tests {
             _ => panic!("Failed when test time limit"),
         }
     }
+
+    #[test]
+    fn test_runtime_error() {
+        match launch(&Path::new("/bin/bash"), &"exit 1", &Limit::new(1.0, 64.0)) {
+            LaunchResult::RE => {}
+            _ => panic!("Failed when test time limit"),
+        }
+    }
 }
