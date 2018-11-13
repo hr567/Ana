@@ -5,8 +5,12 @@ A judge for ACM.
 
 ## Status
 
-Ana is still heavily under development.
-It may take a long time to be completed.
+Ana is ALMOST done.
+But there are some known bugs/todos:
+
+* Ana in Docker can not work now (May be caused by /tmp dir)
+* Need more test
+* Need documents
 
 
 ## Requirements
