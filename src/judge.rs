@@ -1,6 +1,6 @@
 use std::char::from_digit;
 use std::env::temp_dir;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync;
 
 use rand::prelude::*;
@@ -22,41 +22,39 @@ pub enum JudgeResult {
     RE,
 }
 
+fn create_executable_filename() -> PathBuf {
+    let mut executable_file = temp_dir();
+    let filename = {
+        let mut res = String::new();
+        let mut rand_num: u32 = random();
+        for _ in 0..8 {
+            res.push(from_digit(rand_num & 0x0000000f, 16).unwrap());
+            rand_num >>= 4;
+        }
+        res
+    };
+    executable_file.push(filename);
+    executable_file.set_extension("exe");
+    executable_file
+}
+
 pub fn judge(
     language: &str,
     source_code: &str,
     problem: &Problem,
     sender: sync::mpsc::Sender<JudgeResult>,
 ) {
-    let mut executable_file = temp_dir();
-    let filename = {
-        let mut res = String::new();
-
-        let mut rand_num: u32 = random();
-        for _ in 0..8 {
-            res.push(from_digit(rand_num & 0x0000000f, 16).unwrap());
-            rand_num >>= 4;
-        }
-
-        res
-    };
-    executable_file.push(filename);
-    executable_file.set_extension("exe");
-
+    let executable_file = create_executable_filename();
     match Compiler::compile(language, source_code, &executable_file) {
         CompileResult::Pass => {
+            let limit = Limit::new(problem.time_limit, problem.memory_limit);
             for test_case in &problem.test_cases {
-                let limit = Limit::new(problem.time_limit, problem.memory_limit);
-                let judge_result = judge_per_test_case(&executable_file, test_case, &limit);
                 sender
-                    .send(judge_result)
+                    .send(judge_per_test_case(&executable_file, test_case, &limit))
                     .expect("Cannot send the result to receiver");
             }
         }
-
-        CompileResult::CE => {
-            sender.send(JudgeResult::CE).unwrap();
-        }
+        CompileResult::CE => sender.send(JudgeResult::CE).unwrap(),
     };
 }
 

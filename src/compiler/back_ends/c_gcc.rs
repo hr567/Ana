@@ -57,10 +57,7 @@ mod tests {
         executable_file_path.push("c_compiler_test_pass.exe");
 
         assert_eq!(
-            <Compiler as CGcc>::compile(
-                source_file_path.as_path(),
-                executable_file_path.as_path(),
-            ),
+            <Compiler as CGcc>::compile(source_file_path.as_path(), executable_file_path.as_path(),),
             CompileResult::Pass
         );
     }
@@ -78,10 +75,7 @@ mod tests {
         executable_file_path.push("c_compiler_test_fail.exe");
 
         assert_eq!(
-            <Compiler as CGcc>::compile(
-                source_file_path.as_path(),
-                executable_file_path.as_path(),
-            ),
+            <Compiler as CGcc>::compile(source_file_path.as_path(), executable_file_path.as_path(),),
             CompileResult::CE
         );
     }
