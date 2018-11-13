@@ -7,7 +7,7 @@ use rand::prelude::*;
 
 use super::{
     compare::{compare, CompareResult},
-    compiler::{compile, CompileResult, Languages},
+    compiler::{CompileResult, Compiler},
     launcher::{launch, LaunchResult, Limit},
     mtp::{Problem, TestCase},
 };
@@ -23,10 +23,10 @@ pub enum JudgeResult {
 }
 
 pub fn judge(
-    language: &Languages,
+    language: &str,
     source_code: &str,
     problem: &Problem,
-    sender: sync::mpsc::SyncSender<JudgeResult>,
+    sender: sync::mpsc::Sender<JudgeResult>,
 ) {
     let mut executable_file = temp_dir();
     let filename = {
@@ -43,7 +43,7 @@ pub fn judge(
     executable_file.push(filename);
     executable_file.set_extension("exe");
 
-    match compile(language, source_code, &executable_file) {
+    match Compiler::compile(language, source_code, &executable_file) {
         CompileResult::Pass => {
             for test_case in &problem.test_cases {
                 let limit = Limit::new(problem.time_limit, problem.memory_limit);

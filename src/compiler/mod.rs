@@ -1,9 +1,11 @@
-mod back_ends;
-
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+mod back_ends;
+
+use self::back_ends::{CGcc, CppGxx};
 
 #[derive(PartialEq, Debug)]
 pub enum CompileResult {
@@ -11,55 +13,33 @@ pub enum CompileResult {
     CE,
 }
 
-pub enum Languages {
-    CGcc,
-    CppGxx,
-}
+pub struct Compiler {}
 
-pub fn get_language(language: &str) -> Languages {
-    match language {
-        "c.gcc" => Languages::CGcc,
-        "cpp.gxx" => Languages::CppGxx,
-        _ => unimplemented!("Language or compiler {} is not support", language),
+impl Compiler {
+    pub fn compile(language: &str, source_code: &str, executable_file: &Path) -> CompileResult {
+        match language {
+            "c.gcc" => {
+                let source_file = generate_source_file(source_code, <Compiler as CGcc>::suffix());
+                <Compiler as CGcc>::compile(source_file.as_path(), executable_file)
+            }
+            "cpp.gxx" => {
+                let source_file = generate_source_file(source_code, <Compiler as CppGxx>::suffix());
+                <Compiler as CppGxx>::compile(source_file.as_path(), executable_file)
+            }
+            _ => unimplemented!("Language or compiler {} is not support", language),
+        }
     }
 }
 
-trait Compiler {
-    fn suffix(&self) -> &'static str;
-    fn compile(
-        &self,
-        source_file: &Path,
-        executable_file: &Path,
-        optimize_flag: bool,
-    ) -> CompileResult;
-}
-
-pub fn compile(language: &Languages, source_code: &str, executable_file: &Path) -> CompileResult {
-    match language {
-        Languages::CGcc => _compile(back_ends::c_gcc::CGcc::new(), source_code, executable_file),
-        Languages::CppGxx => _compile(
-            back_ends::cpp_gxx::CppGxx::new(),
-            source_code,
-            executable_file,
-        ),
-    }
-}
-
-fn _compile(compiler: impl Compiler, source_code: &str, executable_file: &Path) -> CompileResult {
-    let mut source_file_path = env::temp_dir();
-    source_file_path.push("main");
-    source_file_path.set_extension(compiler.suffix());
-
-    let mut source_file =
-        File::create(source_file_path.as_path()).expect("Cannot create source file");
+fn generate_source_file(source_code: &str, suffix: &str) -> PathBuf {
+    let mut source_file = env::temp_dir();
+    source_file.push("main");
+    source_file.set_extension(suffix);
+    File::create(source_file.as_path())
+        .expect("Cannot create source file")
+        .write_all(source_code.as_bytes())
+        .expect("Failed to write source code to source file");
     source_file
-        .write(source_code.as_bytes())
-        .expect("Cannot write source code to file");
-    source_file
-        .flush()
-        .expect("Cannot write source code to file");
-
-    compiler.compile(source_file_path.as_path(), executable_file, true)
 }
 
 #[cfg(test)]
@@ -72,9 +52,9 @@ mod tests {
     #[test]
     fn test_c_language_compile() {
         let mut executable_file_path = env::temp_dir();
-        executable_file_path.push("c_language_compile_test.exe");
-        let compile_result = compile(
-            &Languages::CGcc,
+        executable_file_path.push("c_compile_test.exe");
+        let compile_result = Compiler::compile(
+            &"c.gcc",
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );
@@ -89,43 +69,9 @@ mod tests {
     #[test]
     fn test_cpp_language_compile() {
         let mut executable_file_path = env::temp_dir();
-        executable_file_path.push("cpp_language_compile_test.exe");
-        let compile_result = compile(
-            &Languages::CppGxx,
-            "int main() { return 0; }\n\n",
-            executable_file_path.as_path(),
-        );
-        assert_eq!(compile_result, CompileResult::Pass);
-
-        let exit_status = Command::new(executable_file_path.to_str().unwrap())
-            .status()
-            .unwrap();
-        assert!(exit_status.success());
-    }
-
-    #[test]
-    fn test_c_compiler_compile() {
-        let mut executable_file_path = env::temp_dir();
-        executable_file_path.push("c_compiler_compile_test.exe");
-        let compile_result = _compile(
-            back_ends::c_gcc::CGcc::new(),
-            "int main() { return 0; }\n\n",
-            executable_file_path.as_path(),
-        );
-        assert_eq!(compile_result, CompileResult::Pass);
-
-        let exit_status = Command::new(executable_file_path.to_str().unwrap())
-            .status()
-            .unwrap();
-        assert!(exit_status.success());
-    }
-
-    #[test]
-    fn test_cpp_compiler_compile() {
-        let mut executable_file_path = env::temp_dir();
-        executable_file_path.push("cpp_compiler_compile_test.exe");
-        let compile_result = _compile(
-            back_ends::cpp_gxx::CppGxx::new(),
+        executable_file_path.push("cpp_compile_test.exe");
+        let compile_result = Compiler::compile(
+            &"cpp.gxx",
             "int main() { return 0; }\n\n",
             executable_file_path.as_path(),
         );

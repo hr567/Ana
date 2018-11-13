@@ -16,7 +16,6 @@ mod judge;
 mod launcher;
 mod mtp;
 
-use self::compiler::get_language;
 use self::judge::{judge, JudgeResult};
 use self::mtp::JudgeInfo;
 
@@ -36,13 +35,10 @@ fn main() {
 
     let judge_info = JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
         .expect("JudgeInfo is invalid");
-    let (language, source_code, problem) = (
-        get_language(&judge_info.language),
-        judge_info.source,
-        judge_info.problem,
-    );
+    let (language, source_code, problem) =
+        (judge_info.language, judge_info.source, judge_info.problem);
 
-    let (sender, receiver) = mpsc::sync_channel::<JudgeResult>(1);
+    let (sender, receiver) = mpsc::channel::<JudgeResult>();
 
     spawn(move || {
         judge(&language, &source_code, &problem, sender);

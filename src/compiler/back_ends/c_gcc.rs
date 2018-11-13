@@ -3,29 +3,19 @@ use std::process::Command;
 
 use super::{CompileResult, Compiler};
 
-pub struct CGcc {}
-
-impl CGcc {
-    pub fn new() -> Self {
-        CGcc {}
+pub trait CGcc {
+    fn suffix() -> &'static str {
+        "c"
     }
+    fn compile(source_file: &Path, executable_file: &Path) -> CompileResult;
 }
 
-impl Compiler for CGcc {
-    fn suffix(&self) -> &'static str {
-        &"c"
-    }
-
-    fn compile(
-        &self,
-        source_file: &Path,
-        executable_file: &Path,
-        optimize_flag: bool,
-    ) -> CompileResult {
+impl CGcc for Compiler {
+    fn compile(source_file: &Path, executable_file: &Path) -> CompileResult {
         let status = Command::new("gcc")
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
-            .arg(if optimize_flag { "-O2" } else { "" })
+            .arg("-O2")
             .arg("-fno-asm")
             .arg("-Wall")
             .arg("-lm")
@@ -51,14 +41,11 @@ mod tests {
 
     #[test]
     fn test_suffix() {
-        let compiler = CGcc::new();
-        assert_eq!(compiler.suffix(), "c");
+        assert_eq!(<Compiler as CGcc>::suffix(), "c");
     }
 
     #[test]
     fn test_compile() {
-        let compiler = CGcc::new();
-
         let mut source_file_path = env::temp_dir();
         source_file_path.push("c_compiler_test_pass.c");
 
@@ -70,10 +57,9 @@ mod tests {
         executable_file_path.push("c_compiler_test_pass.exe");
 
         assert_eq!(
-            compiler.compile(
+            <Compiler as CGcc>::compile(
                 source_file_path.as_path(),
                 executable_file_path.as_path(),
-                true,
             ),
             CompileResult::Pass
         );
@@ -81,8 +67,6 @@ mod tests {
 
     #[test]
     fn test_compile_failed() {
-        let compiler = CGcc::new();
-
         let mut source_file_path = env::temp_dir();
         source_file_path.push("c_compiler_test_fail.c");
 
@@ -94,10 +78,9 @@ mod tests {
         executable_file_path.push("c_compiler_test_fail.exe");
 
         assert_eq!(
-            compiler.compile(
+            <Compiler as CGcc>::compile(
                 source_file_path.as_path(),
                 executable_file_path.as_path(),
-                true,
             ),
             CompileResult::CE
         );
