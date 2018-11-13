@@ -2,7 +2,7 @@ use std::char::from_digit;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use rand::prelude::*;
@@ -26,7 +26,6 @@ impl Limit {
     }
 }
 
-// one of: none, CPU_TIME, REAL_TIME, MEMORY, OUTPUT
 pub enum LrunExceed {
     Pass,
     CpuTime,
@@ -45,40 +44,42 @@ pub struct LrunResult {
     pub exceed: LrunExceed,
 }
 
-fn load_lrun_log(lrun_log_path: &Path) -> LrunResult {
-    let lrun_log = {
-        let mut res = String::new();
-        File::open(lrun_log_path)
-            .expect("Cannot open lrun log")
-            .read_to_string(&mut res)
-            .expect("Cannot read the lrun log");
-        res
-    };
-    let lrun_result: Vec<&str> = lrun_log
-        .trim()
-        .split("\n")
-        .map(|s| s.trim().split_whitespace().collect::<Vec<&str>>()[1])
-        .collect();
+impl LrunResult {
+    fn from_log_file(lrun_log_path: &Path) -> LrunResult {
+        let lrun_log = {
+            let mut res = String::new();
+            File::open(lrun_log_path)
+                .expect("Cannot open lrun log")
+                .read_to_string(&mut res)
+                .expect("Cannot read the lrun log");
+            res
+        };
+        let lrun_result: Vec<&str> = lrun_log
+            .trim()
+            .split("\n")
+            .map(|s| s.trim().split_whitespace().collect::<Vec<&str>>()[1])
+            .collect();
 
-    LrunResult {
-        memory: lrun_result[0].parse().unwrap(),
-        cpu_time: lrun_result[1].parse().unwrap(),
-        real_time: lrun_result[2].parse().unwrap(),
-        signaled: lrun_result[3].parse().unwrap(),
-        exit_code: lrun_result[4].parse().unwrap(),
-        term_sig: lrun_result[5].parse().unwrap(),
-        exceed: match lrun_result[6] {
-            "none" => LrunExceed::Pass,
-            "CPU_TIME" => LrunExceed::CpuTime,
-            "REAL_TIME" => LrunExceed::RealTime,
-            "MEMORY" => LrunExceed::Memory,
-            "OUTPUT" => LrunExceed::Output,
-            _ => panic!("Unknown type of exceed"),
-        },
+        LrunResult {
+            memory: lrun_result[0].parse().unwrap(),
+            cpu_time: lrun_result[1].parse().unwrap(),
+            real_time: lrun_result[2].parse().unwrap(),
+            signaled: lrun_result[3].parse().unwrap(),
+            exit_code: lrun_result[4].parse().unwrap(),
+            term_sig: lrun_result[5].parse().unwrap(),
+            exceed: match lrun_result[6] {
+                "none" => LrunExceed::Pass,
+                "CPU_TIME" => LrunExceed::CpuTime,
+                "REAL_TIME" => LrunExceed::RealTime,
+                "MEMORY" => LrunExceed::Memory,
+                "OUTPUT" => LrunExceed::Output,
+                _ => panic!("Unknown type of exceed"),
+            },
+        }
     }
 }
 
-pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResult {
+fn create_empty_lrun_log_file() -> PathBuf {
     let mut lrun_log = env::temp_dir();
     let filename = {
         let mut res = String::new();
@@ -91,8 +92,13 @@ pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResul
     };
     lrun_log.push(filename);
     lrun_log.set_extension("log");
+    lrun_log
+}
 
-    let mut child = Command::new("sudo")
+pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResult {
+    let lrun_log = create_empty_lrun_log_file();
+
+    let mut child = Command::new("sudo") // lrun need root user to be executed
         .arg("bash")
         .arg("-c")
         .arg(format!(
@@ -116,27 +122,28 @@ pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResul
         .write_all(input.as_bytes())
         .expect("Failed to write to stdin");
 
-    if let Ok(output) = child.wait_with_output() {
-        assert!(output.status.success(), "lrun crashed! Why?");
-        let lrun_result = load_lrun_log(&lrun_log);
-        match lrun_result.exceed {
-            LrunExceed::Pass => {
-                if lrun_result.exit_code == 0 {
-                    if let Ok(output) = String::from_utf8(output.stdout) {
-                        LaunchResult::Pass(output, lrun_result)
-                    } else {
-                        LaunchResult::RE
-                    }
+    let output = child
+        .wait_with_output()
+        .expect("Error when executing the program");
+
+    assert!(output.status.success(), "lrun crashed! Why?");
+
+    let lrun_result = LrunResult::from_log_file(&lrun_log);
+    match lrun_result.exceed {
+        LrunExceed::Pass => {
+            if lrun_result.exit_code == 0 {
+                if let Ok(output) = String::from_utf8(output.stdout) {
+                    LaunchResult::Pass(output, lrun_result)
                 } else {
                     LaunchResult::RE
                 }
+            } else {
+                LaunchResult::RE
             }
-            LrunExceed::CpuTime | LrunExceed::RealTime => LaunchResult::TLE,
-            LrunExceed::Memory => LaunchResult::MLE,
-            LrunExceed::Output => LaunchResult::OLE,
         }
-    } else {
-        unimplemented!()
+        LrunExceed::CpuTime | LrunExceed::RealTime => LaunchResult::TLE,
+        LrunExceed::Memory => LaunchResult::MLE,
+        LrunExceed::Output => LaunchResult::OLE,
     }
 }
 
