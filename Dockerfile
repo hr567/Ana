@@ -31,6 +31,8 @@ RUN groupadd -r -g 593 lrun && \
     apt-get install -y --no-install-recommends \
     sudo \
     libseccomp-dev \
+    gcc \
+    g++ \
     libzmq3-dev && \
     apt-get clean
 EXPOSE 8800
