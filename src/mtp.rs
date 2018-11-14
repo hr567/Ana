@@ -39,7 +39,6 @@ impl JudgeInfo {
 pub struct Problem {
     pub time_limit: f64,
     pub memory_limit: f64,
-    pub optimize: bool,
     pub test_cases: Vec<TestCase>,
 }
 

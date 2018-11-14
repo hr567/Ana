@@ -1,16 +1,12 @@
 # [Ana Project](https://gitlab.com/hr567/Ana)
 
-A judge for ACM.
+A open source judge for ACMers in Rust
 
 
 ## Status
 
 Ana is ALMOST done.
-But there are some known bugs/todos:
-
-* Ana in Docker can not work now (May be caused by /tmp dir)
-* Need more test
-* Need documents
+But we need more test and documents.
 
 
 ## Requirements
@@ -20,16 +16,59 @@ But there are some known bugs/todos:
 * lrun (https://github.com/quark-zju/lrun)
 
 
-## Building
+## Usage
+
+### Docker
 
 `docker build -t hr567/ana .`
 
+`docker run --privileged --port 8800:8800 hr567/ana`
 
-## Testing
+After starting the container,
+you can test it using `python tests/client.py`
+to test if it work correctly.
 
-`docker run -d hr567/ana`
+### Normal
 
-`python tests/client.py`
+Use `cargo test` to run unit test.
+
+`cargo run` to run ana on the localhost.
+
+
+## MTP
+
+Ana use ZeroMQ to communicate with online judge server.
+
+It use a REP to receive and send message.
+A message is a json string and
+is defined as following examples:
+
+* Judge
+
+  ```json
+  {
+    "language": "cpp.gxx",
+    "source": "...",
+    "problem": {
+      time_limit: 1.0,
+      memory_limit: 64.0, // Mb
+      test_cases: [
+        ["1 1", "2"],
+        ["2 3", "5"],
+        ["1 1\n2 3", "2\n5"]
+      ]
+    }
+  }
+  ```
+* Report
+
+  ```json
+  {
+    "status": "AC",
+    "time": 0.8,
+    "memory": 1000 // bytes
+  }
+  ```
 
 
 ## License
