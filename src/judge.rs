@@ -14,12 +14,12 @@ use super::{
 
 pub enum JudgeResult {
     CE,
-    AC,
-    WA,
-    TLE,
-    MLE,
-    OLE,
-    RE,
+    AC(f64, u64), // time, memory
+    WA(f64, u64),
+    TLE(f64, u64),
+    MLE(f64, u64),
+    OLE(f64, u64),
+    RE(f64, u64),
 }
 
 fn create_executable_filename() -> PathBuf {
@@ -36,6 +36,21 @@ fn create_executable_filename() -> PathBuf {
     executable_file.push(filename);
     executable_file.set_extension("exe");
     executable_file
+}
+
+fn judge_per_test_case(executable_file: &Path, test_case: &TestCase, limit: &Limit) -> JudgeResult {
+    match launch(executable_file, test_case.input.as_str(), limit) {
+        LaunchResult::Pass(output, report) => {
+            match compare(output.as_str(), test_case.answer.as_str()) {
+                CompareResult::AC => JudgeResult::AC(report.cpu_time, report.memory),
+                CompareResult::WA => JudgeResult::WA(report.cpu_time, report.memory),
+            }
+        }
+        LaunchResult::RE(report) => JudgeResult::RE(report.cpu_time, report.memory),
+        LaunchResult::MLE(report) => JudgeResult::MLE(report.cpu_time, report.memory),
+        LaunchResult::TLE(report) => JudgeResult::TLE(report.cpu_time, report.memory),
+        LaunchResult::OLE(report) => JudgeResult::OLE(report.cpu_time, report.memory),
+    }
 }
 
 pub fn judge(
@@ -56,19 +71,4 @@ pub fn judge(
         }
         CompileResult::CE => sender.send(JudgeResult::CE).unwrap(),
     };
-}
-
-fn judge_per_test_case(executable_file: &Path, test_case: &TestCase, limit: &Limit) -> JudgeResult {
-    match launch(executable_file, test_case.input.as_str(), limit) {
-        LaunchResult::Pass(output, _lrun_report) => {
-            match compare(output.as_str(), test_case.answer.as_str()) {
-                CompareResult::AC => JudgeResult::AC,
-                CompareResult::WA => JudgeResult::WA,
-            }
-        }
-        LaunchResult::RE => JudgeResult::RE,
-        LaunchResult::MLE => JudgeResult::MLE,
-        LaunchResult::TLE => JudgeResult::TLE,
-        LaunchResult::OLE => JudgeResult::OLE,
-    }
 }

@@ -2,6 +2,27 @@
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct ReportInfo {
+    pub status: String,
+    pub time: f64,
+    pub memory: u64,
+}
+
+impl ReportInfo {
+    pub fn new(status: &str, time: f64, memory: u64) -> ReportInfo {
+        ReportInfo {
+            status: String::from(status),
+            time,
+            memory,
+        }
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct JudgeInfo {
     pub language: String,
     pub source: String,

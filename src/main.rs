@@ -17,7 +17,6 @@ mod launcher;
 mod mtp;
 
 use self::judge::{judge, JudgeResult};
-use self::mtp::JudgeInfo;
 
 fn main() {
     let context = zmq::Context::new();
@@ -33,7 +32,7 @@ fn main() {
         )
         .expect("Cannot bind");
 
-    let judge_info = JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
+    let judge_info = mtp::JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
         .expect("JudgeInfo is invalid");
     let (language, source_code, problem) =
         (judge_info.language, judge_info.source, judge_info.problem);
@@ -46,41 +45,65 @@ fn main() {
 
     use self::JudgeResult::*;
 
-    for (i, res) in receiver.iter().enumerate() {
+    for res in receiver {
         match res {
             CE => {
                 socket
-                    .msg_send(zmq::Message::from(format!("#{} CE", i).as_str()), 0)
+                    .msg_send(
+                        zmq::Message::from(mtp::ReportInfo::new("CE", 0.0, 0).to_json().as_str()),
+                        0,
+                    )
                     .unwrap();
             }
-            AC => {
+            AC(time, memory) => {
                 socket
-                    .msg_send(zmq::Message::from(format!("#{} AC", i).as_str()), 0)
+                    .msg_send(
+                        zmq::Message::from(
+                            mtp::ReportInfo::new("AC", time, memory).to_json().as_str(),
+                        ),
+                        0,
+                    )
                     .unwrap();
             }
-            WA => {
+            WA(time, memory) => {
                 socket
-                    .msg_send(zmq::Message::from(format!("#{} WA", i).as_str()), 0)
+                    .msg_send(
+                        zmq::Message::from(
+                            mtp::ReportInfo::new("WA", time, memory).to_json().as_str(),
+                        ),
+                        0,
+                    )
                     .unwrap();
             }
-            TLE => {
+            TLE(time, memory) => {
                 socket
-                    .msg_send(zmq::Message::from(format!("#{} TLE", i).as_str()), 0)
+                    .msg_send(
+                        zmq::Message::from(
+                            mtp::ReportInfo::new("TLE", time, memory).to_json().as_str(),
+                        ),
+                        0,
+                    )
                     .unwrap();
             }
-            MLE => {
+            MLE(time, memory) => {
                 socket
-                    .msg_send(zmq::Message::from(format!("#{} MLE", i).as_str()), 0)
+                    .msg_send(
+                        zmq::Message::from(
+                            mtp::ReportInfo::new("MLE", time, memory).to_json().as_str(),
+                        ),
+                        0,
+                    )
                     .unwrap();
             }
-            OLE => {
+            OLE(_time, _memory) => unimplemented!("OLE flag is not support"),
+            RE(time, memory) => {
                 socket
-                    .msg_send(zmq::Message::from(format!("#{} OLE", i).as_str()), 0)
-                    .unwrap();
-            }
-            RE => {
-                socket
-                    .msg_send(zmq::Message::from(format!("#{} RE", i).as_str()), 0)
+                    .msg_send(
+                        zmq::Message::from(
+                            mtp::ReportInfo::new("RE", time, memory).to_json().as_str(),
+                        ),
+                        0,
+                    )
                     .unwrap();
             }
         }

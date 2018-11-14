@@ -9,10 +9,10 @@ use rand::prelude::*;
 
 pub enum LaunchResult {
     Pass(String, LrunResult),
-    TLE,
-    MLE,
-    OLE,
-    RE,
+    TLE(LrunResult),
+    MLE(LrunResult),
+    OLE(LrunResult),
+    RE(LrunResult),
 }
 
 pub struct Limit {
@@ -135,15 +135,15 @@ pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResul
                 if let Ok(output) = String::from_utf8(output.stdout) {
                     LaunchResult::Pass(output, lrun_result)
                 } else {
-                    LaunchResult::RE
+                    LaunchResult::RE(lrun_result)
                 }
             } else {
-                LaunchResult::RE
+                LaunchResult::RE(lrun_result)
             }
         }
-        LrunExceed::CpuTime | LrunExceed::RealTime => LaunchResult::TLE,
-        LrunExceed::Memory => LaunchResult::MLE,
-        LrunExceed::Output => LaunchResult::OLE,
+        LrunExceed::CpuTime | LrunExceed::RealTime => LaunchResult::TLE(lrun_result),
+        LrunExceed::Memory => LaunchResult::MLE(lrun_result),
+        LrunExceed::Output => LaunchResult::OLE(lrun_result),
     }
 }
 
@@ -175,7 +175,7 @@ mod tests {
             &"while true; do echo -n; done",
             &Limit::new(1.0, 64.0),
         ) {
-            LaunchResult::TLE => {}
+            LaunchResult::TLE(_) => {}
             _ => panic!("Failed when test time limit"),
         }
     }
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_runtime_error() {
         match launch(&Path::new("/bin/bash"), &"exit 1", &Limit::new(1.0, 64.0)) {
-            LaunchResult::RE => {}
+            LaunchResult::RE(_) => {}
             _ => panic!("Failed when test time limit"),
         }
     }
