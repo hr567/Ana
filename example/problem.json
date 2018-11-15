@@ -1,14 +1,6 @@
 {
-    "id": 1000,
-    "name": "Example A+B Problem",
-    "source_filename": "main",
-    "executable_filename": "main",
-    "input_filename": "example.in",
-    "output_filename": "example.out",
     "time_limit": 1.0,
-    "memory_limit": 128.0,
-    "stdio": true,
-    "optimize": true,
+    "memory_limit": 32.0,
     "test_cases": [
         {
             "input": "1 1",

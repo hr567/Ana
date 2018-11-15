@@ -25,8 +25,7 @@ But we need more test and documents.
 `docker run --privileged --port 8800:8800 hr567/ana`
 
 After starting the container,
-you can test it using `python tests/client.py`
-to test if it work correctly.
+you can test it using `python3 tests/basic_test.py` to test if it work correctly.
 
 ### Normal
 
@@ -66,7 +65,7 @@ is defined as following examples:
   {
     "status": "AC",
     "time": 0.8,
-    "memory": 1000 // bytes
+    "memory": 1024 // bytes
   }
   ```
 
