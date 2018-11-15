@@ -6,7 +6,8 @@ A open source judge for ACMers in Rust
 ## Status
 
 Ana is ALMOST done.
-But we need more test and documents.
+We need more test and documents
+and a few more functions.
 
 
 ## Requirements
