@@ -1,0 +1,9 @@
+[package]
+name = "AnaManager"
+version = "0.1.0"
+authors = ["hr567 <hr567@hr567.me>"]
+edition = "2018"
+
+[dependencies]
+shiplift = "0.3"
+zmq= "0.8"
