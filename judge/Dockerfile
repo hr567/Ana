@@ -17,6 +17,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
     libclang-dev \
+    pkg-config \
     clang && \
     cd /Ana && \
     cargo build -v --release
