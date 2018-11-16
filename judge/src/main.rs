@@ -20,7 +20,7 @@ use self::judge::{judge, JudgeResult};
 
 fn main() {
     let context = zmq::Context::new();
-    let socket = context.socket(&zmq::SocketType::REP);
+    let socket = context.socket(zmq::REP).expect("Cannot create zmq socket");
     socket
         .bind(
             format!(
@@ -32,8 +32,14 @@ fn main() {
         )
         .expect("Cannot bind");
 
-    let judge_info = mtp::JudgeInfo::from_json(socket.msg_recv(0).unwrap().to_string().as_str())
-        .expect("JudgeInfo is invalid");
+    let judge_info = mtp::JudgeInfo::from_json(
+        socket
+            .recv_string(0)
+            .expect("Failed to receive the judge information")
+            .expect("Cannot transfer the message into String")
+            .as_str(),
+    )
+    .expect("JudgeInfo is invalid");
     let (language, source_code, problem) =
         (judge_info.language, judge_info.source, judge_info.problem);
 
@@ -49,48 +55,37 @@ fn main() {
         match res {
             CE => {
                 socket
-                    .msg_send(
-                        zmq::Message::from(mtp::ReportInfo::new("CE", 0.0, 0).to_json().as_str()),
-                        0,
-                    )
+                    .send_str(mtp::ReportInfo::new("CE", 0.0, 0).to_json().as_str(), 0)
                     .unwrap();
             }
             AC(time, memory) => {
                 socket
-                    .msg_send(
-                        zmq::Message::from(
-                            mtp::ReportInfo::new("AC", time, memory).to_json().as_str(),
-                        ),
+                    .send_str(
+                        mtp::ReportInfo::new("AC", time, memory).to_json().as_str(),
                         0,
                     )
                     .unwrap();
             }
             WA(time, memory) => {
                 socket
-                    .msg_send(
-                        zmq::Message::from(
-                            mtp::ReportInfo::new("WA", time, memory).to_json().as_str(),
-                        ),
+                    .send_str(
+                        mtp::ReportInfo::new("WA", time, memory).to_json().as_str(),
                         0,
                     )
                     .unwrap();
             }
             TLE(time, memory) => {
                 socket
-                    .msg_send(
-                        zmq::Message::from(
-                            mtp::ReportInfo::new("TLE", time, memory).to_json().as_str(),
-                        ),
+                    .send_str(
+                        mtp::ReportInfo::new("TLE", time, memory).to_json().as_str(),
                         0,
                     )
                     .unwrap();
             }
             MLE(time, memory) => {
                 socket
-                    .msg_send(
-                        zmq::Message::from(
-                            mtp::ReportInfo::new("MLE", time, memory).to_json().as_str(),
-                        ),
+                    .send_str(
+                        mtp::ReportInfo::new("MLE", time, memory).to_json().as_str(),
                         0,
                     )
                     .unwrap();
@@ -98,15 +93,15 @@ fn main() {
             OLE(_time, _memory) => unimplemented!("OLE flag is not support"),
             RE(time, memory) => {
                 socket
-                    .msg_send(
-                        zmq::Message::from(
-                            mtp::ReportInfo::new("RE", time, memory).to_json().as_str(),
-                        ),
+                    .send_str(
+                        mtp::ReportInfo::new("RE", time, memory).to_json().as_str(),
                         0,
                     )
                     .unwrap();
             }
         }
-        socket.recv(0, 0).unwrap();
+        socket
+            .recv_bytes(0)
+            .expect("Cannot receive the reply from server");
     }
 }

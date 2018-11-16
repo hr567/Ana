@@ -1,5 +1,5 @@
 FROM ubuntu:16.04 AS build_lrun
-COPY externals/lrun /lrun
+COPY judge/externals/lrun /lrun
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     sudo \
@@ -11,8 +11,8 @@ RUN apt-get update && \
     make
 
 FROM rustlang/rust:nightly-slim AS build_ana
-COPY Cargo.toml Cargo.lock /Ana/
-COPY src/ /Ana/src
+COPY judge/Cargo.toml judge/Cargo.lock /Ana/
+COPY judge/src/ /Ana/src
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
