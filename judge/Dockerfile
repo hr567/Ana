@@ -11,7 +11,7 @@ RUN apt-get update && \
     make
 
 FROM rustlang/rust:nightly-slim AS build_ana
-COPY Cargo.toml Cargo.lock /Ana/
+COPY Cargo.toml /Ana/
 COPY src/ /Ana/src
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
