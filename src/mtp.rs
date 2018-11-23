@@ -3,15 +3,19 @@ use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct ReportInfo {
+    pub id: String,
+    pub case_index: usize,
     pub status: String,
     pub time: f64,
     pub memory: u64,
 }
 
 impl ReportInfo {
-    pub fn new(status: &str, time: f64, memory: u64) -> ReportInfo {
+    pub fn new(id: &str, case_index: usize, status: &str, time: f64, memory: u64) -> ReportInfo {
         ReportInfo {
-            status: String::from(status),
+            id: id.to_string(),
+            case_index,
+            status: status.to_string(),
             time,
             memory,
         }
@@ -24,6 +28,7 @@ impl ReportInfo {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct JudgeInfo {
+    pub id: String,
     pub language: String,
     pub source: String,
     pub problem: Problem,

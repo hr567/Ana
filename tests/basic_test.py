@@ -8,6 +8,7 @@ If you haven't built the image. See README for more information.
 
 import json
 import unittest
+import uuid
 
 import docker
 import zmq
@@ -19,6 +20,7 @@ with open("example/problem.json", 'rt') as f:
 
 def generate_judge(source):
     judge_info = {
+        "id": uuid.uuid4().hex,
         "language": "cpp.gxx",
         "source": source,
         "problem": PROBLEM,
@@ -27,7 +29,6 @@ def generate_judge(source):
 
 
 class AnaTest(unittest.TestCase):
-
     def setUp(self):
         self.cli = docker.from_env()
         self.container = self.cli.containers.run(
@@ -57,6 +58,8 @@ class AnaTest(unittest.TestCase):
         for _ in range(PROBLEM_TEST_CASE_COUNT):
             report = self.socket.recv().decode()
             report = json.loads(report)
+            self.assertEqual(report["id"], json.loads(judge_info)["id"])
+            self.assertEqual(report["case_index"], 0)
             self.assertEqual(report["status"], "CE")
             self.assertEqual(report["time"], 0.0)
             self.assertEqual(report["memory"], 0)
@@ -69,9 +72,11 @@ class AnaTest(unittest.TestCase):
             source = f.read()
         judge_info = generate_judge(source)
         self.socket.send(judge_info.encode())
-        for _ in range(PROBLEM_TEST_CASE_COUNT):
+        for i in range(PROBLEM_TEST_CASE_COUNT):
             report = self.socket.recv().decode()
             report = json.loads(report)
+            self.assertEqual(report["id"], json.loads(judge_info)["id"])
+            self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "AC")
             self.assertLessEqual(report["time"], 1.0)
             self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
@@ -83,9 +88,11 @@ class AnaTest(unittest.TestCase):
             source = f.read()
         judge_info = generate_judge(source)
         self.socket.send(judge_info.encode())
-        for _ in range(PROBLEM_TEST_CASE_COUNT):
+        for i in range(PROBLEM_TEST_CASE_COUNT):
             report = self.socket.recv().decode()
             report = json.loads(report)
+            self.assertEqual(report["id"], json.loads(judge_info)["id"])
+            self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "MLE")
             self.assertLessEqual(report["time"], 1.0)
             self.assertAlmostEqual(
@@ -98,9 +105,11 @@ class AnaTest(unittest.TestCase):
             source = f.read()
         judge_info = generate_judge(source)
         self.socket.send(judge_info.encode())
-        for _ in range(PROBLEM_TEST_CASE_COUNT):
+        for i in range(PROBLEM_TEST_CASE_COUNT):
             report = self.socket.recv().decode()
             report = json.loads(report)
+            self.assertEqual(report["id"], json.loads(judge_info)["id"])
+            self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "RE")
             self.assertLessEqual(report["time"], 1.0)
             self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
@@ -112,9 +121,11 @@ class AnaTest(unittest.TestCase):
             source = f.read()
         judge_info = generate_judge(source)
         self.socket.send(judge_info.encode())
-        for _ in range(PROBLEM_TEST_CASE_COUNT):
+        for i in range(PROBLEM_TEST_CASE_COUNT):
             report = self.socket.recv().decode()
             report = json.loads(report)
+            self.assertEqual(report["id"], json.loads(judge_info)["id"])
+            self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "TLE")
             self.assertAlmostEqual(report["time"], 1.0, delta=0.05)
             self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
@@ -126,9 +137,11 @@ class AnaTest(unittest.TestCase):
             source = f.read()
         judge_info = generate_judge(source)
         self.socket.send(judge_info.encode())
-        for _ in range(PROBLEM_TEST_CASE_COUNT):
+        for i in range(PROBLEM_TEST_CASE_COUNT):
             report = self.socket.recv().decode()
             report = json.loads(report)
+            self.assertEqual(report["id"], json.loads(judge_info)["id"])
+            self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "WA")
             self.assertLessEqual(report["time"], 1.0)
             self.assertLessEqual(report["memory"], 32 * 1024 * 1024)

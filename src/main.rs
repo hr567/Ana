@@ -2,11 +2,9 @@ use std::env;
 use std::sync::mpsc;
 use std::thread::spawn;
 
-#[macro_use]
-extern crate serde_derive;
-
 extern crate rand;
 extern crate serde;
+extern crate serde_derive;
 extern crate serde_json;
 extern crate zmq;
 
@@ -19,29 +17,34 @@ mod mtp;
 use self::judge::{judge, JudgeResult};
 
 fn main() {
+    let endpoint = format!(
+        "tcp://{}:{}",
+        env::var("ANA_ADDRESS").unwrap_or(String::from("0.0.0.0")),
+        env::var("ANA_PORT").unwrap_or(String::from("8800"))
+    );
+
     let context = zmq::Context::new();
-    let socket = context.socket(zmq::REP).expect("Cannot create zmq socket");
+    let socket = context
+        .socket(zmq::REP)
+        .expect("Failed to create zmq REP socket");
     socket
-        .bind(
-            format!(
-                "tcp://{}:{}",
-                env::var("ANA_ADDRESS").unwrap_or(String::from("0.0.0.0")),
-                env::var("ANA_PORT").unwrap_or(String::from("8800"))
-            )
-            .as_str(),
-        )
-        .expect("Cannot bind");
+        .bind(endpoint.as_str())
+        .expect(format!("Cannot bind to {}", endpoint).as_str());
 
     let judge_info = mtp::JudgeInfo::from_json(
         socket
             .recv_string(0)
             .expect("Failed to receive the judge information")
-            .expect("Cannot transfer the message into String")
+            .expect("Received message is not a string")
             .as_str(),
     )
     .expect("JudgeInfo is invalid");
-    let (language, source_code, problem) =
-        (judge_info.language, judge_info.source, judge_info.problem);
+    let (id, language, source_code, problem) = (
+        judge_info.id,
+        judge_info.language,
+        judge_info.source,
+        judge_info.problem,
+    );
 
     let (sender, receiver) = mpsc::channel::<JudgeResult>();
 
@@ -49,52 +52,65 @@ fn main() {
         judge(&language, &source_code, &problem, sender);
     });
 
-    use self::JudgeResult::*;
-
-    for res in receiver {
+    for (index, res) in receiver.iter().enumerate() {
         match res {
-            CE => {
-                socket
-                    .send_str(mtp::ReportInfo::new("CE", 0.0, 0).to_json().as_str(), 0)
-                    .unwrap();
-            }
-            AC(time, memory) => {
+            JudgeResult::CE => {
                 socket
                     .send_str(
-                        mtp::ReportInfo::new("AC", time, memory).to_json().as_str(),
+                        mtp::ReportInfo::new(id.as_str(), 0, "CE", 0.0, 0)
+                            .to_json()
+                            .as_str(),
                         0,
                     )
                     .unwrap();
             }
-            WA(time, memory) => {
+            JudgeResult::AC(time, memory) => {
                 socket
                     .send_str(
-                        mtp::ReportInfo::new("WA", time, memory).to_json().as_str(),
+                        mtp::ReportInfo::new(id.as_str(), index, "AC", time, memory)
+                            .to_json()
+                            .as_str(),
                         0,
                     )
                     .unwrap();
             }
-            TLE(time, memory) => {
+            JudgeResult::WA(time, memory) => {
                 socket
                     .send_str(
-                        mtp::ReportInfo::new("TLE", time, memory).to_json().as_str(),
+                        mtp::ReportInfo::new(id.as_str(), index, "WA", time, memory)
+                            .to_json()
+                            .as_str(),
                         0,
                     )
                     .unwrap();
             }
-            MLE(time, memory) => {
+            JudgeResult::TLE(time, memory) => {
                 socket
                     .send_str(
-                        mtp::ReportInfo::new("MLE", time, memory).to_json().as_str(),
+                        mtp::ReportInfo::new(id.as_str(), index, "TLE", time, memory)
+                            .to_json()
+                            .as_str(),
                         0,
                     )
                     .unwrap();
             }
-            OLE(_time, _memory) => unimplemented!("OLE flag is not support"),
-            RE(time, memory) => {
+            JudgeResult::MLE(time, memory) => {
                 socket
                     .send_str(
-                        mtp::ReportInfo::new("RE", time, memory).to_json().as_str(),
+                        mtp::ReportInfo::new(id.as_str(), index, "MLE", time, memory)
+                            .to_json()
+                            .as_str(),
+                        0,
+                    )
+                    .unwrap();
+            }
+            JudgeResult::OLE(_time, _memory) => unimplemented!("OLE flag is not support"),
+            JudgeResult::RE(time, memory) => {
+                socket
+                    .send_str(
+                        mtp::ReportInfo::new(id.as_str(), index, "RE", time, memory)
+                            .to_json()
+                            .as_str(),
                         0,
                     )
                     .unwrap();

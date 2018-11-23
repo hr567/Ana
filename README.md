@@ -47,6 +47,7 @@ is defined as following examples:
 
   ```json
   {
+    "id": "b6555832ef2111e8bc847470fd3b4381", // UUID(hex)
     "language": "cpp.gxx",
     "source": "...",
     "problem": {
@@ -64,6 +65,8 @@ is defined as following examples:
 
   ```json
   {
+    "id": "b6555832ef2111e8bc847470fd3b4381",
+    "case_index": 0,
     "status": "AC",
     "time": 0.8,
     "memory": 1024 // bytes
