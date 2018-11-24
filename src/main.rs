@@ -52,6 +52,8 @@ fn main() {
         judge(&language, &source_code, &problem, sender);
     });
 
+    let mut summary_report = mtp::ReportInfo::new(id.as_str(), 0, "AC", 0.0, 0);
+
     for (index, res) in receiver.iter().enumerate() {
         match res {
             JudgeResult::CE => {
@@ -63,6 +65,7 @@ fn main() {
                         0,
                     )
                     .unwrap();
+                break;
             }
             JudgeResult::AC(time, memory) => {
                 socket
@@ -73,6 +76,13 @@ fn main() {
                         0,
                     )
                     .unwrap();
+
+                if time > summary_report.time {
+                    summary_report.time = time;
+                }
+                if memory > summary_report.memory {
+                    summary_report.memory = memory;
+                }
             }
             JudgeResult::WA(time, memory) => {
                 socket
@@ -83,6 +93,16 @@ fn main() {
                         0,
                     )
                     .unwrap();
+
+                if time > summary_report.time {
+                    summary_report.time = time;
+                }
+                if memory > summary_report.memory {
+                    summary_report.memory = memory;
+                }
+                if summary_report.status == "AC" {
+                    summary_report.status = String::from("WA");
+                }
             }
             JudgeResult::TLE(time, memory) => {
                 socket
@@ -93,6 +113,16 @@ fn main() {
                         0,
                     )
                     .unwrap();
+
+                if time > summary_report.time {
+                    summary_report.time = time;
+                }
+                if memory > summary_report.memory {
+                    summary_report.memory = memory;
+                }
+                if summary_report.status == "AC" {
+                    summary_report.status = String::from("TLE");
+                }
             }
             JudgeResult::MLE(time, memory) => {
                 socket
@@ -103,6 +133,16 @@ fn main() {
                         0,
                     )
                     .unwrap();
+
+                if time > summary_report.time {
+                    summary_report.time = time;
+                }
+                if memory > summary_report.memory {
+                    summary_report.memory = memory;
+                }
+                if summary_report.status == "AC" {
+                    summary_report.status = String::from("MLE");
+                }
             }
             JudgeResult::OLE(_time, _memory) => unimplemented!("OLE flag is not support"),
             JudgeResult::RE(time, memory) => {
@@ -114,10 +154,23 @@ fn main() {
                         0,
                     )
                     .unwrap();
+
+                if time > summary_report.time {
+                    summary_report.time = time;
+                }
+                if memory > summary_report.memory {
+                    summary_report.memory = memory;
+                }
+                if summary_report.status == "AC" {
+                    summary_report.status = String::from("RE");
+                }
             }
         }
         socket
             .recv_bytes(0)
             .expect("Cannot receive the reply from server");
     }
+    socket
+        .send_str(summary_report.to_json().as_str(), 0)
+        .unwrap();
 }

@@ -1,6 +1,6 @@
 [[package]]
 name = "ana"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
