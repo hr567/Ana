@@ -36,5 +36,5 @@ RUN groupadd -r -g 593 lrun && \
     g++ \
     libzmq3-dev && \
     apt-get clean
-EXPOSE 8800
+EXPOSE 8800 8801
 CMD [ "ana" ]

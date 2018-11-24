@@ -12,6 +12,10 @@ and a few more functions.
 
 ## Requirements
 
+* Docker
+
+To build Ana at local:
+
 * Rust toolchain (Edition 2018 or higher)
 * ZeroMQ (such as libzmq-dev)
 * lrun (https://github.com/quark-zju/lrun)

@@ -1,23 +1,25 @@
 // TODO: Add support for other kinds of problem
 use serde_derive::{Deserialize, Serialize};
 
+use super::judge::JudgeReport;
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct ReportInfo {
     pub id: String,
     pub case_index: usize,
-    pub status: String,
+    pub status: &'static str,
     pub time: f64,
     pub memory: u64,
 }
 
 impl ReportInfo {
-    pub fn new(id: &str, case_index: usize, status: &str, time: f64, memory: u64) -> ReportInfo {
+    pub fn new(id: &str, case_index: usize, report: &JudgeReport) -> ReportInfo {
         ReportInfo {
             id: id.to_string(),
             case_index,
-            status: status.to_string(),
-            time,
-            memory,
+            status: report.status.to_str(),
+            time: report.time,
+            memory: report.memory,
         }
     }
 

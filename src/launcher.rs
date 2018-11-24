@@ -8,11 +8,11 @@ use std::process::{Command, Stdio};
 use rand::prelude::*;
 
 pub enum LaunchResult {
-    Pass(String, LrunResult),
-    TLE(LrunResult),
-    MLE(LrunResult),
-    OLE(LrunResult),
-    RE(LrunResult),
+    Pass(String),
+    TLE,
+    MLE,
+    OLE,
+    RE,
 }
 
 pub struct Limit {
@@ -56,7 +56,7 @@ impl LrunResult {
         };
         let lrun_result: Vec<&str> = lrun_log
             .trim()
-            .split("\n")
+            .split('\n')
             .map(|s| s.trim().split_whitespace().collect::<Vec<&str>>()[1])
             .collect();
 
@@ -85,7 +85,7 @@ fn create_empty_lrun_log_file() -> PathBuf {
         let mut res = String::new();
         let mut rand_num: u32 = random();
         for _ in 0..8 {
-            res.push(from_digit(rand_num & 0x0000000f, 16).unwrap());
+            res.push(from_digit(rand_num & 0x0000_000f, 16).unwrap());
             rand_num >>= 4;
         }
         res
@@ -95,7 +95,7 @@ fn create_empty_lrun_log_file() -> PathBuf {
     lrun_log
 }
 
-pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResult {
+pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> (LaunchResult, LrunResult) {
     let lrun_log = create_empty_lrun_log_file();
 
     let mut child = Command::new("sudo") // lrun need root user to be executed
@@ -128,23 +128,27 @@ pub fn launch(executable_file: &Path, input: &str, limit: &Limit) -> LaunchResul
 
     assert!(output.status.success(), "lrun crashed! Why?");
 
-    let lrun_result = LrunResult::from_log_file(&lrun_log);
-    match lrun_result.exceed {
-        LrunExceed::Pass => {
-            if lrun_result.exit_code == 0 {
-                if let Ok(output) = String::from_utf8(output.stdout) {
-                    LaunchResult::Pass(output, lrun_result)
+    let report = LrunResult::from_log_file(&lrun_log);
+
+    (
+        match report.exceed {
+            LrunExceed::Pass => {
+                if report.exit_code == 0 {
+                    if let Ok(output) = String::from_utf8(output.stdout) {
+                        LaunchResult::Pass(output)
+                    } else {
+                        LaunchResult::RE
+                    }
                 } else {
-                    LaunchResult::RE(lrun_result)
+                    LaunchResult::RE
                 }
-            } else {
-                LaunchResult::RE(lrun_result)
             }
-        }
-        LrunExceed::CpuTime | LrunExceed::RealTime => LaunchResult::TLE(lrun_result),
-        LrunExceed::Memory => LaunchResult::MLE(lrun_result),
-        LrunExceed::Output => LaunchResult::OLE(lrun_result),
-    }
+            LrunExceed::CpuTime | LrunExceed::RealTime => LaunchResult::TLE,
+            LrunExceed::Memory => LaunchResult::MLE,
+            LrunExceed::Output => LaunchResult::OLE,
+        },
+        report,
+    )
 }
 
 #[cfg(test)]
@@ -157,8 +161,10 @@ mod tests {
             &Path::new("/bin/bash"),
             &"echo hello world",
             &Limit::new(1.0, 64.0),
-        ) {
-            LaunchResult::Pass(output, _lrun_report) => assert_eq!(output, "hello world\n"),
+        )
+        .0
+        {
+            LaunchResult::Pass(output) => assert_eq!(output, "hello world\n"),
             _ => panic!("Failed when execute program"),
         }
     }
@@ -174,16 +180,18 @@ mod tests {
             &Path::new("/bin/bash"),
             &"while true; do echo -n; done",
             &Limit::new(1.0, 64.0),
-        ) {
-            LaunchResult::TLE(_) => {}
+        )
+        .0
+        {
+            LaunchResult::TLE => {}
             _ => panic!("Failed when test time limit"),
         }
     }
 
     #[test]
     fn test_runtime_error() {
-        match launch(&Path::new("/bin/bash"), &"exit 1", &Limit::new(1.0, 64.0)) {
-            LaunchResult::RE(_) => {}
+        match launch(&Path::new("/bin/bash"), &"exit 1", &Limit::new(1.0, 64.0)).0 {
+            LaunchResult::RE => {}
             _ => panic!("Failed when test time limit"),
         }
     }
