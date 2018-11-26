@@ -1,0 +1,23 @@
+{
+    "type": "spj",
+    "time_limit": 1.0,
+    "memory_limit": 32.0,
+    "checker": {
+        "language": "cpp.gxx",
+        "code": "#define METHOD 1\n\n#include <cstdio>\n#define AC 0\n#define WA 1\nusing namespace std;\nint main(int argc, char *args[]) {\n  FILE *f_in = fopen(args[1], \"r\");\n  FILE *f_out = fopen(args[2], \"r\");\n  FILE *f_user = fopen(args[3], \"r\");\n\n#ifndef METHOD\n  return -1;\n#else\n#if METHOD == 1\n  int ans = 0;\n  while (fscanf(f_user, \"%d\", &ans) != EOF) {\n    int a, b;\n    if (fscanf(f_in, \"%d%d\", &a, &b) != EOF) {\n      if (a + b != ans) {\n        return WA;\n      }\n    }\n  }\n#elif METHOD == 2\n  int ans = 0;\n  while (fscanf(f_user, \"%d\", &ans) != EOF) {\n    int std_ans;\n    if (fscanf(f_in, \"%d\", &std_ans) != EOF) {\n      if (ans != std_ans) {\n        return WA;\n      }\n    }\n  }\n#endif\n  return AC;\n#endif\n}"
+    },
+    "test_cases": [
+        {
+            "input": "1 1",
+            "answer": "2"
+        },
+        {
+            "input": "13 5\n14 7\n23 45",
+            "answer": "18\n21\n68"
+        },
+        {
+            "input": "24 3\n17 -5\n123 945",
+            "answer": "27\n12\n1068"
+        }
+    ]
+}
