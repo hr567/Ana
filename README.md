@@ -51,16 +51,25 @@ is defined as following examples:
 
   ```json
   {
-    "id": "b6555832ef2111e8bc847470fd3b4381", // UUID(hex)
+    "id": "b6555832ef2111e8bc847470fd3b4381",
     "language": "cpp.gxx",
     "source": "...",
     "problem": {
-      time_limit: 1.0,
-      memory_limit: 64.0, // Mb
-      test_cases: [
-        ["1 1", "2"],
-        ["2 3", "5"],
-        ["1 1\n2 3", "2\n5"]
+      "time_limit": 1.0,
+      "memory_limit": 32.0,
+      "test_cases": [
+          {
+              "input": "1 1",
+              "answer": "2"
+          },
+          {
+              "input": "13 5\n14 7\n23 45",
+              "answer": "18\n21\n68"
+          },
+          {
+              "input": "24 3\n17 -5\n123 945",
+              "answer": "27\n12\n1068"
+          }
       ]
     }
   }
