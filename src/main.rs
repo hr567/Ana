@@ -45,12 +45,7 @@ fn main() {
     let (channel_sender, channel_receiver) = mpsc::channel::<judge::JudgeReport>();
 
     spawn(move || {
-        judge::judge(
-            &judge_info.language,
-            &judge_info.source,
-            &judge_info.problem,
-            &channel_sender,
-        );
+        judge::judge(&judge_info.source, &judge_info.problem, &channel_sender);
     });
 
     for (index, report) in channel_receiver.iter().enumerate() {

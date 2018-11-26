@@ -9,7 +9,7 @@ use super::{
     compare::diff,
     compiler::{CompileResult, Compiler},
     launcher::{launch, LaunchResult, Limit},
-    mtp::{Problem, TestCase},
+    mtp::{Problem, Source, TestCase},
 };
 
 pub struct JudgeReport {
@@ -89,14 +89,9 @@ fn judge_per_test_case(executable_file: &Path, test_case: &TestCase, limit: &Lim
     )
 }
 
-pub fn judge(
-    language: &str,
-    source_code: &str,
-    problem: &Problem,
-    sender: &sync::mpsc::Sender<JudgeReport>,
-) {
+pub fn judge(source: &Source, problem: &Problem, sender: &sync::mpsc::Sender<JudgeReport>) {
     let executable_file = create_executable_filename();
-    match Compiler::compile(language, source_code, &executable_file) {
+    match Compiler::compile(&source.language, &source.code, &executable_file) {
         CompileResult::Pass => {
             let limit = Limit::new(problem.time_limit, problem.memory_limit);
             for test_case in &problem.test_cases {

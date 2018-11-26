@@ -62,7 +62,7 @@ is defined as following examples:
       "code": "..."
     },
     "problem": {
-      "type": "normal",
+      "problem_type": "normal",
       "time_limit": 1.0,
       "memory_limit": 32.0,
       "checker": {
@@ -97,7 +97,7 @@ is defined as following examples:
       "code": "..."
     },
     "problem": {
-      "type": "spj",
+      "problem_type": "spj",
       "time_limit": 1.0,
       "memory_limit": 32.0,
       "checker": {

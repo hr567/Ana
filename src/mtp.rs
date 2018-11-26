@@ -31,8 +31,7 @@ impl ReportInfo {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct JudgeInfo {
     pub id: String,
-    pub language: String,
-    pub source: String,
+    pub source: Source,
     pub problem: Problem,
 }
 
@@ -44,9 +43,17 @@ impl JudgeInfo {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Problem {
+    pub problem_type: String,
     pub time_limit: f64,
     pub memory_limit: f64,
+    pub checker: Source,
     pub test_cases: Vec<TestCase>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Source {
+    pub language: String,
+    pub code: String,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

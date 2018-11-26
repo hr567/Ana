@@ -1,9 +1,11 @@
 {
     "id": "b6555832ef2111e8bc847470fd3b4381",
-    "language": "cpp.gxx",
-    "source": "#include <iostream>\nint main() { int a, b; while (std::cin >> a >> b) { std::cout << a + b << std::endl; } return 0; }",
+    "source": {
+        "language": "cpp.gxx",
+        "code": "#include <iostream>\nint main() { int a, b; while (std::cin >> a >> b) { std::cout << a + b << std::endl; } return 0; }"
+    },
     "problem": {
-        "type": "spj",
+        "problem_type": "spj",
         "time_limit": 1.0,
         "memory_limit": 32.0,
         "checker": {
