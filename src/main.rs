@@ -1,7 +1,6 @@
 use std::sync::mpsc;
 use std::thread::spawn;
 
-extern crate rand;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
@@ -45,7 +44,7 @@ fn main() {
     let (channel_sender, channel_receiver) = mpsc::channel::<judge::JudgeReport>();
 
     spawn(move || {
-        judge::judge(&judge_info.source, &judge_info.problem, &channel_sender);
+        judge::judge(&judge_info, &channel_sender);
     });
 
     for (index, report) in channel_receiver.iter().enumerate() {
