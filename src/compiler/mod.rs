@@ -7,16 +7,10 @@ mod back_ends;
 
 use self::back_ends::{CGcc, CppGxx};
 
-#[derive(PartialEq, Debug)]
-pub enum CompileResult {
-    Pass,
-    CE,
-}
-
 pub struct Compiler {}
 
 impl Compiler {
-    pub fn compile(language: &str, source_code: &str, executable_file: &Path) -> CompileResult {
+    pub fn compile(language: &str, source_code: &str, executable_file: &Path) -> Result<(), ()> {
         match language {
             "c.gcc" => {
                 let source_file = generate_source_file(source_code, <Compiler as CGcc>::suffix());
@@ -32,7 +26,7 @@ impl Compiler {
 }
 
 fn generate_source_file(source_code: &str, suffix: &str) -> PathBuf {
-    let mut source_file = env::temp_dir();
+    let mut source_file = PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
     source_file.push("main");
     source_file.set_extension(suffix);
     File::create(source_file.as_path())
@@ -54,15 +48,13 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("c_compile_test.exe");
         let compile_result = Compiler::compile(
-            &"c.gcc",
-            "int main() { return 0; }\n\n",
+            "c.gcc",
+            "int main() { return 0; }",
             executable_file_path.as_path(),
         );
-        assert_eq!(compile_result, CompileResult::Pass);
+        assert!(compile_result.is_ok());
 
-        let exit_status = Command::new(executable_file_path.to_str().unwrap())
-            .status()
-            .unwrap();
+        let exit_status = Command::new(executable_file_path).status().unwrap();
         assert!(exit_status.success());
     }
 
@@ -71,15 +63,13 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("cpp_compile_test.exe");
         let compile_result = Compiler::compile(
-            &"cpp.gxx",
-            "int main() { return 0; }\n\n",
+            "cpp.gxx",
+            "int main() { return 0; }",
             executable_file_path.as_path(),
         );
-        assert_eq!(compile_result, CompileResult::Pass);
+        assert!(compile_result.is_ok());
 
-        let exit_status = Command::new(executable_file_path.to_str().unwrap())
-            .status()
-            .unwrap();
+        let exit_status = Command::new(executable_file_path).status().unwrap();
         assert!(exit_status.success());
     }
 }

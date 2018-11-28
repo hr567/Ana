@@ -7,7 +7,7 @@ mod source;
 
 pub use self::{
     judge::JudgeInfo,
-    problem::{Problem, TestCase},
+    problem::{Problem, ProblemType, TestCase},
     report::ReportInfo,
     source::Source,
 };

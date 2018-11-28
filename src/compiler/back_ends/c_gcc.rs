@@ -1,17 +1,17 @@
 use std::path::Path;
 use std::process::Command;
 
-use super::{CompileResult, Compiler};
+use super::Compiler;
 
 pub trait CGcc {
     fn suffix() -> &'static str {
         "c"
     }
-    fn compile(source_file: &Path, executable_file: &Path) -> CompileResult;
+    fn compile(source_file: &Path, executable_file: &Path) -> Result<(), ()>;
 }
 
 impl CGcc for Compiler {
-    fn compile(source_file: &Path, executable_file: &Path) -> CompileResult {
+    fn compile(source_file: &Path, executable_file: &Path) -> Result<(), ()> {
         let status = Command::new("gcc")
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
@@ -24,9 +24,9 @@ impl CGcc for Compiler {
             .status()
             .expect("Failed to compile the source");
         if status.success() {
-            CompileResult::Pass
+            Ok(())
         } else {
-            CompileResult::CE
+            Err(())
         }
     }
 }
@@ -56,10 +56,11 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("c_compiler_test_pass.exe");
 
-        assert_eq!(
-            <Compiler as CGcc>::compile(source_file_path.as_path(), executable_file_path.as_path(),),
-            CompileResult::Pass
-        );
+        assert!(<Compiler as CGcc>::compile(
+            source_file_path.as_path(),
+            executable_file_path.as_path()
+        )
+        .is_ok());
     }
 
     #[test]
@@ -74,9 +75,10 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("c_compiler_test_fail.exe");
 
-        assert_eq!(
-            <Compiler as CGcc>::compile(source_file_path.as_path(), executable_file_path.as_path(),),
-            CompileResult::CE
-        );
+        assert!(<Compiler as CGcc>::compile(
+            source_file_path.as_path(),
+            executable_file_path.as_path()
+        )
+        .is_err());
     }
 }

@@ -1,9 +1,9 @@
-use std::fs::File;
+use std::fs;
 use std::io::prelude::*;
-use std::path::Path;
+use std::path;
 
 pub enum LaunchReport {
-    Pass(String),
+    Pass(Box<path::Path>),
     TLE,
     MLE,
     OLE,
@@ -29,10 +29,10 @@ pub struct LrunReport {
 }
 
 impl LrunReport {
-    pub fn from_log_file(lrun_log_path: &Path) -> LrunReport {
+    pub fn from_log_file(lrun_log_path: &path::Path) -> LrunReport {
         let lrun_log = {
             let mut res = String::new();
-            File::open(lrun_log_path)
+            fs::File::open(lrun_log_path)
                 .expect("Cannot open lrun log")
                 .read_to_string(&mut res)
                 .expect("Cannot read the lrun log");

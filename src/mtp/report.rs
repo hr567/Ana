@@ -1,3 +1,5 @@
+use std::env;
+
 use serde_derive::{Deserialize, Serialize};
 
 use super::JudgeReport;
@@ -6,17 +8,17 @@ use super::JudgeReport;
 pub struct ReportInfo {
     pub id: String,
     pub case_index: usize,
-    pub status: &'static str,
+    pub status: String,
     pub time: f64,
     pub memory: u64,
 }
 
 impl ReportInfo {
-    pub fn new(id: &str, case_index: usize, report: &JudgeReport) -> ReportInfo {
+    pub fn new(case_index: usize, report: &JudgeReport) -> ReportInfo {
         ReportInfo {
-            id: id.to_string(),
+            id: env::var("ANA_JUDGE_ID").unwrap(),
             case_index,
-            status: report.status.to_str(),
+            status: report.status.to_string(),
             time: report.time,
             memory: report.memory,
         }

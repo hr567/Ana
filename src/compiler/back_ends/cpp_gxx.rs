@@ -1,17 +1,17 @@
 use std::path::Path;
 use std::process::Command;
 
-use super::{CompileResult, Compiler};
+use super::Compiler;
 
 pub trait CppGxx {
     fn suffix() -> &'static str {
         "cpp"
     }
-    fn compile(source_file: &Path, executable_file: &Path) -> CompileResult;
+    fn compile(source_file: &Path, executable_file: &Path) -> Result<(), ()>;
 }
 
 impl CppGxx for Compiler {
-    fn compile(source_file: &Path, executable_file: &Path) -> CompileResult {
+    fn compile(source_file: &Path, executable_file: &Path) -> Result<(), ()> {
         let status = Command::new("g++")
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
@@ -24,9 +24,9 @@ impl CppGxx for Compiler {
             .status()
             .expect("Failed to compile the source");
         if status.success() {
-            CompileResult::Pass
+            Ok(())
         } else {
-            CompileResult::CE
+            Err(())
         }
     }
 }
@@ -56,13 +56,11 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("cpp_compiler_test_pass.exe");
 
-        assert_eq!(
-            <Compiler as CppGxx>::compile(
-                source_file_path.as_path(),
-                executable_file_path.as_path(),
-            ),
-            CompileResult::Pass
-        );
+        assert!(<Compiler as CppGxx>::compile(
+            source_file_path.as_path(),
+            executable_file_path.as_path(),
+        )
+        .is_ok());
     }
 
     #[test]
@@ -77,12 +75,10 @@ mod tests {
         let mut executable_file_path = env::temp_dir();
         executable_file_path.push("cpp_compiler_test_fail.exe");
 
-        assert_eq!(
-            <Compiler as CppGxx>::compile(
-                source_file_path.as_path(),
-                executable_file_path.as_path(),
-            ),
-            CompileResult::CE
-        );
+        assert!(<Compiler as CppGxx>::compile(
+            source_file_path.as_path(),
+            executable_file_path.as_path(),
+        )
+        .is_err());
     }
 }

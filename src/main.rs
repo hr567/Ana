@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::mpsc;
 use std::thread::spawn;
 
@@ -13,6 +14,11 @@ mod launcher;
 mod mtp;
 
 fn main() {
+    env::set_var(
+        "ANA_WORK_DIR",
+        env::var("ANA_WORK_DIR").unwrap_or(env::temp_dir().to_str().unwrap().to_string()),
+    );
+
     let context = zmq::Context::new();
     let receiver = context
         .socket(zmq::PULL)
@@ -34,12 +40,9 @@ fn main() {
     let judge_info = mtp::JudgeInfo::from_json(&judge_info)
         .expect("Judge information is invalid. Check it at server");
 
-    let judge_id = judge_info.id.clone();
-    let mut summary_report = mtp::ReportInfo::new(
-        &judge_id,
-        0,
-        &judge::JudgeReport::new(judge::JudgeResult::AC, 0.0, 0),
-    );
+    env::set_var("ANA_JUDGE_ID", &judge_info.id);
+    let mut summary_report =
+        mtp::ReportInfo::new(0, &judge::JudgeReport::new(judge::JudgeResult::AC, 0.0, 0));
 
     let (channel_sender, channel_receiver) = mpsc::channel::<judge::JudgeReport>();
 
@@ -49,14 +52,11 @@ fn main() {
 
     for (index, report) in channel_receiver.iter().enumerate() {
         sender
-            .send_str(
-                &mtp::ReportInfo::new(&judge_id, index, &report).to_json(),
-                0,
-            )
+            .send_str(&mtp::ReportInfo::new(index, &report).to_json(), 0)
             .unwrap();
         summary_report.case_index += 1;
         if summary_report.status == "AC" {
-            summary_report.status = report.status.to_str();
+            summary_report.status = report.status.to_string();
         }
         if report.time > summary_report.time {
             summary_report.time = report.time;
