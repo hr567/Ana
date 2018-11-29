@@ -14,7 +14,7 @@ import docker
 import zmq
 
 PROBLEM_TEST_CASE_COUNT = 3
-with open("example/problem.json", 'rt') as f:
+with open("example/spj_problem.json", 'rt') as f:
     PROBLEM = json.loads(f.read())
 
 
@@ -33,7 +33,6 @@ class AnaTest(unittest.TestCase):
         self.container = self.cli.containers.run(
             image="hr567/ana",
             privileged=True,
-            environment=["RUST_BACKTRACE=1"],
             detach=True,
         )
 
@@ -54,30 +53,11 @@ class AnaTest(unittest.TestCase):
         self.context.destroy()
         self.cli.close()
 
-    def test_ce(self):
-        with open("example/source.ce.cpp", 'rt') as f:
-            source = {
-                "language": "cpp.gxx",
-                "code": f.read(),
-            }
-        judge_info = generate_judge(source)
-        self.sender.send(judge_info.encode())
-        for _ in range(PROBLEM_TEST_CASE_COUNT):
-            report = self.receiver.recv().decode()
-            report = json.loads(report)
-            self.assertEqual(report["id"], json.loads(judge_info)["id"])
-            self.assertEqual(report["case_index"], 0)
-            self.assertEqual(report["status"], "CE")
-            self.assertEqual(report["time"], 0.0)
-            self.assertEqual(report["memory"], 0)
-            break
-        self.assertEqual(self.container.wait(timeout=5)["StatusCode"], 0)
-
     def test_ac(self):
         with open("example/source.cpp", 'rt') as f:
             source = {
-                "language": "cpp.gxx",
-                "code": f.read(),
+                "language": "cpp.cxx",
+                "code": f.read()
             }
         judge_info = generate_judge(source)
         self.sender.send(judge_info.encode())
@@ -101,8 +81,8 @@ class AnaTest(unittest.TestCase):
     def test_mle(self):
         with open("example/source.mle.cpp", 'rt') as f:
             source = {
-                "language": "cpp.gxx",
-                "code": f.read(),
+                "language": "cpp.cxx",
+                "code": f.read()
             }
         judge_info = generate_judge(source)
         self.sender.send(judge_info.encode())
@@ -128,8 +108,8 @@ class AnaTest(unittest.TestCase):
     def test_re(self):
         with open("example/source.re.cpp", 'rt') as f:
             source = {
-                "language": "cpp.gxx",
-                "code": f.read(),
+                "language": "cpp.cxx",
+                "code": f.read()
             }
         judge_info = generate_judge(source)
         self.sender.send(judge_info.encode())
@@ -153,8 +133,8 @@ class AnaTest(unittest.TestCase):
     def test_tle(self):
         with open("example/source.tle.cpp", 'rt') as f:
             source = {
-                "language": "cpp.gxx",
-                "code": f.read(),
+                "language": "cpp.cxx",
+                "code": f.read()
             }
         judge_info = generate_judge(source)
         self.sender.send(judge_info.encode())
@@ -178,8 +158,8 @@ class AnaTest(unittest.TestCase):
     def test_wa(self):
         with open("example/source.wa.cpp", 'rt') as f:
             source = {
-                "language": "cpp.gxx",
-                "code": f.read(),
+                "language": "cpp.cxx",
+                "code": f.read()
             }
         judge_info = generate_judge(source)
         self.sender.send(judge_info.encode())
