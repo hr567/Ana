@@ -11,18 +11,18 @@ pub use self::{
     report::{LaunchReport, LrunExceed, LrunReport},
 };
 
-fn create_lrun_log_file() -> path::PathBuf {
-    let mut lrun_log = path::PathBuf::from(env::var("ANA_WORD_DIR").unwrap());
+fn create_lrun_log_file() -> Box<path::Path> {
+    let mut lrun_log = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
     lrun_log.push(env::var("ANA_JUDGE_ID").unwrap());
     lrun_log.set_extension("log");
-    lrun_log
+    lrun_log.into_boxed_path()
 }
 
-fn create_output_file() -> path::PathBuf {
-    let mut output_file = path::PathBuf::from(env::var("ANA_WORD_DIR").unwrap());
+fn create_output_file() -> Box<path::Path> {
+    let mut output_file = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
     output_file.push(env::var("ANA_JUDGE_ID").unwrap());
     output_file.set_extension("out");
-    output_file
+    output_file.into_boxed_path()
 }
 
 pub fn launch(
@@ -42,8 +42,10 @@ pub fn launch(
             limit.time,
             limit.time + 0.1,
             limit.memory * 1024.0 * 1024.0,
-            executable_file.to_str().unwrap(),
-            lrun_log.to_str().unwrap(),
+            executable_file
+                .to_str()
+                .expect("Failed to format executable file"),
+            lrun_log.to_str().expect("Failed to format lrun log file"),
         ))
         .stdin(fs::File::open(&input_file).expect("Failed to open input file"))
         .stdout(fs::File::create(&output_file).expect("Failed to create output file"))
@@ -58,7 +60,7 @@ pub fn launch(
         match report.exceed {
             LrunExceed::Pass => {
                 if report.exit_code == 0 {
-                    LaunchReport::Pass(output_file.into_boxed_path())
+                    LaunchReport::Pass(output_file)
                 } else {
                     LaunchReport::RE
                 }
@@ -76,8 +78,15 @@ mod tests {
     use super::*;
     use std::io::prelude::*;
 
+    fn set_test_environments() {
+        env::set_var("ANA_WORK_DIR", env::temp_dir());
+        env::set_var("ANA_JUDGE_ID", "test_judge_id");
+    }
+
     #[test]
     fn test_launcher() {
+        set_test_environments();
+
         let mut input_file = env::temp_dir();
         input_file.push("test_launcher_input");
         fs::File::create(&input_file)
@@ -111,6 +120,8 @@ mod tests {
 
     #[test]
     fn test_time_limit() {
+        set_test_environments();
+
         let mut input_file = env::temp_dir();
         input_file.push("test_time_limit");
         fs::File::create(&input_file)
@@ -132,6 +143,8 @@ mod tests {
 
     #[test]
     fn test_runtime_error() {
+        set_test_environments();
+
         let mut input_file = env::temp_dir();
         input_file.push("test_runtime_error");
         fs::File::create(&input_file)
