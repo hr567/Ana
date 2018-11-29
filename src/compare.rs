@@ -41,8 +41,79 @@ impl Comparer {
                     .read_to_string(&mut answer)
                     .expect("Failed to read answer content to string");
 
-                diff(&output, &answer)
+                !diff(&output, &answer)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+
+    #[test]
+    fn test_diff_complete_eq() {
+        assert!(!diff("hello world", "hello world"));
+    }
+
+    #[test]
+    fn test_diff_with_empty_line_at_eof() {
+        assert!(!diff("hello world\n", "hello world"));
+        assert!(!diff("hello world", "hello world\n"));
+    }
+
+    #[test]
+    fn test_diff_with_space_at_eol() {
+        assert!(!diff("hello world ", "hello world"));
+        assert!(!diff("hello world", "hello world "));
+    }
+
+    #[test]
+    fn test_diff_with_both_empty_line_at_eof_and_space_at_eol() {
+        assert!(!diff("hello world \n", "hello world"));
+        assert!(!diff("hello world", "hello world \n"));
+        assert!(!diff("hello world\n", "hello world "));
+        assert!(!diff("hello world ", "hello world\n"));
+        assert!(!diff("hello world \n", "hello world\n"));
+        assert!(!diff("hello world\n", "hello world \n"));
+        assert!(!diff("hello world\n ", "hello world\n"));
+        assert!(!diff("hello world\n", "hello world\n "));
+    }
+
+    #[test]
+    fn test_check_without_spj() {
+        env::set_var("ANA_WORK_DIR", env::temp_dir());
+        let work_dir = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
+        let mut input_file = path::PathBuf::new();
+        input_file.clone_from(&work_dir);
+        input_file.push("test_check_without_spj");
+        input_file.set_extension("in");
+
+        let mut output_file = path::PathBuf::new();
+        output_file.clone_from(&work_dir);
+        output_file.push("test_check_without_spj");
+        output_file.set_extension("out");
+        fs::File::create(&output_file)
+            .unwrap()
+            .write_all(b"hello world")
+            .unwrap();
+
+        let mut answer_file = path::PathBuf::new();
+        answer_file.clone_from(&work_dir);
+        answer_file.push("test_check_without_spj");
+        answer_file.set_extension("ans");
+        fs::File::create(&answer_file)
+            .unwrap()
+            .write_all(b"hello world")
+            .unwrap();
+
+        assert!(Comparer::check(
+            &input_file,
+            &output_file,
+            &answer_file,
+            &None,
+        ));
     }
 }

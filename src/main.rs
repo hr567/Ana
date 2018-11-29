@@ -16,7 +16,8 @@ mod mtp;
 fn main() {
     env::set_var(
         "ANA_WORK_DIR",
-        env::var("ANA_WORK_DIR").unwrap_or(env::temp_dir().to_str().unwrap().to_string()),
+        env::var("ANA_WORK_DIR")
+            .unwrap_or_else(|_| String::from(env::temp_dir().to_str().unwrap())),
     );
 
     let context = zmq::Context::new();

@@ -15,11 +15,11 @@ mod structure;
 
 pub use self::structure::{JudgeReport, JudgeResult};
 
-fn create_executable_filename(id: &str) -> path::PathBuf {
+fn create_executable_filename(id: &str) -> Box<path::Path> {
     let mut executable_file = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
     executable_file.push(id);
     executable_file.set_extension("exe");
-    executable_file
+    executable_file.into_boxed_path()
 }
 
 fn prepare_problem(problem: &Problem) -> (Limit, &Vec<TestCase>, Option<Box<path::Path>>) {
@@ -32,7 +32,7 @@ fn prepare_problem(problem: &Problem) -> (Limit, &Vec<TestCase>, Option<Box<path
                 let spj = create_executable_filename("spj");
                 Compiler::compile(&problem.checker.language, &problem.checker.code, &spj)
                     .expect("Failed to build spj");
-                Some(spj.into_boxed_path())
+                Some(spj)
             }
         },
     )
@@ -71,7 +71,7 @@ fn judge_per_test_case(
     let (result, report) = launch(executable_file, input_file, limit);
     let judge_result = match result {
         LaunchReport::Pass(output_file) => {
-            if Comparer::check(&input_file, &output_file, &answer_file, spj) {
+            if Comparer::check(&input_file, &output_file, &answer_file, &spj) {
                 JudgeResult::AC
             } else {
                 JudgeResult::WA
