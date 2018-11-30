@@ -23,8 +23,8 @@ impl Comparer {
         match spj {
             Some(spj) => process::Command::new(spj)
                 .arg(input_file)
-                .arg(output_file)
                 .arg(answer_file)
+                .arg(output_file)
                 .status()
                 .expect("Failed to run special judge")
                 .success(),

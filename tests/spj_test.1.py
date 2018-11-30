@@ -16,6 +16,8 @@ import zmq
 PROBLEM_TEST_CASE_COUNT = 3
 with open("example/spj_problem.json", 'rt') as f:
     PROBLEM = json.loads(f.read())
+    with open("example/spj.1.cpp") as f:
+        PROBLEM["checker"]["code"] = f.read()
 
 
 def generate_judge(source):
@@ -56,7 +58,7 @@ class AnaTest(unittest.TestCase):
     def test_ac(self):
         with open("example/source.cpp", 'rt') as f:
             source = {
-                "language": "cpp.cxx",
+                "language": "cpp.gxx",
                 "code": f.read()
             }
         judge_info = generate_judge(source)
@@ -81,7 +83,7 @@ class AnaTest(unittest.TestCase):
     def test_mle(self):
         with open("example/source.mle.cpp", 'rt') as f:
             source = {
-                "language": "cpp.cxx",
+                "language": "cpp.gxx",
                 "code": f.read()
             }
         judge_info = generate_judge(source)
@@ -108,7 +110,7 @@ class AnaTest(unittest.TestCase):
     def test_re(self):
         with open("example/source.re.cpp", 'rt') as f:
             source = {
-                "language": "cpp.cxx",
+                "language": "cpp.gxx",
                 "code": f.read()
             }
         judge_info = generate_judge(source)
@@ -133,7 +135,7 @@ class AnaTest(unittest.TestCase):
     def test_tle(self):
         with open("example/source.tle.cpp", 'rt') as f:
             source = {
-                "language": "cpp.cxx",
+                "language": "cpp.gxx",
                 "code": f.read()
             }
         judge_info = generate_judge(source)
@@ -158,7 +160,7 @@ class AnaTest(unittest.TestCase):
     def test_wa(self):
         with open("example/source.wa.cpp", 'rt') as f:
             source = {
-                "language": "cpp.cxx",
+                "language": "cpp.gxx",
                 "code": f.read()
             }
         judge_info = generate_judge(source)
