@@ -27,11 +27,14 @@ To build Ana at local:
 
 `docker build -t hr567/ana .`
 
-`docker run --privileged --port 8800:8800 hr567/ana`
+After build the image,
+test it using:
 
-After starting the container,
-you can test it using `python3 tests/basic_test.py`
-to test if it work correctly.
+`python3 tests/basic_test.py`
+
+`python3 tests/spj_test.0.py`
+
+`python3 tests/spj_test.1.py`
 
 ### Normal
 
