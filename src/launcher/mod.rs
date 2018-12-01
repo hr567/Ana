@@ -75,6 +75,8 @@ pub fn launch(
 
 #[cfg(test)]
 mod tests {
+    // FIXME: This tests fail sometime. But work well most of time.
+
     use super::*;
     use std::io::prelude::*;
 
@@ -88,13 +90,14 @@ mod tests {
         set_test_environments();
 
         let mut input_file = env::temp_dir();
-        input_file.push("test_launcher_input");
+        input_file.push("test_launcher");
+        input_file.set_extension("in");
         fs::File::create(&input_file)
-            .expect("Failed to create test_launcher_input file")
+            .expect("Failed to create test_launcher.in file")
             .write_all("echo hello world".as_bytes())
-            .expect("Failed to write to test_launcher_input file");
+            .expect("Failed to write to test_launcher.in file");
         match launch(
-            &path::Path::new("/bin/bash"),
+            &path::Path::new("bash"),
             input_file.as_path(),
             &Limit::new(1.0, 64.0),
         )
@@ -103,7 +106,7 @@ mod tests {
             LaunchReport::Pass(output_file) => {
                 let mut output = String::new();
                 fs::File::open(output_file)
-                    .expect("Failed to read output file")
+                    .expect("Failed to open output file")
                     .read_to_string(&mut output)
                     .expect("Failed to read output from file");
                 assert_eq!(output, "hello world\n")
@@ -124,12 +127,13 @@ mod tests {
 
         let mut input_file = env::temp_dir();
         input_file.push("test_time_limit");
+        input_file.set_extension("in");
         fs::File::create(&input_file)
-            .expect("Failed to create test_time_limit file")
+            .expect("Failed to create test_time_limit.in file")
             .write_all("while true; do echo -n; done".as_bytes())
-            .expect("Failed to write to test_time_limit file");
+            .expect("Failed to write to test_time_limit.in file");
         match launch(
-            &path::Path::new("/bin/bash"),
+            &path::Path::new("bash"),
             input_file.as_path(),
             &Limit::new(1.0, 64.0),
         )
@@ -147,19 +151,20 @@ mod tests {
 
         let mut input_file = env::temp_dir();
         input_file.push("test_runtime_error");
+        input_file.set_extension("in");
         fs::File::create(&input_file)
-            .expect("Failed to create test_time_limit file")
+            .expect("Failed to create test_runtime_error.in file")
             .write_all("exit 1".as_bytes())
-            .expect("Failed to write to test_time_limit file");
+            .expect("Failed to write to test_runtime_error.in file");
         match launch(
-            &path::Path::new("/bin/bash"),
+            &path::Path::new("bash"),
             input_file.as_path(),
             &Limit::new(1.0, 64.0),
         )
         .0
         {
             LaunchReport::RE => {}
-            _ => panic!("Failed when test time limit"),
+            _ => panic!("Failed when test runtime error"),
         }
         fs::remove_file(&input_file).expect("Failed to delete input file after testing");
     }
