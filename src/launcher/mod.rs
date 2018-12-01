@@ -75,7 +75,7 @@ pub fn launch(
 
 #[cfg(test)]
 mod tests {
-    // FIXME: This tests fail sometime. But work well most of time.
+    // FIXME: These tests fail sometime. But work well most of time.
 
     use super::*;
     use std::io::prelude::*;
@@ -118,7 +118,26 @@ mod tests {
 
     #[test]
     fn test_memory_limit() {
-        unimplemented!("TODO: How to test memory")
+        set_test_environments();
+
+        let mut input_file = env::temp_dir();
+        input_file.push("test_memory_limit");
+        input_file.set_extension("in");
+        fs::File::create(&input_file)
+            .expect("Failed to create test_memory_limit.in file")
+            .write_all("x='a'; while true; do x=$x$x; done".as_bytes())
+            .expect("Failed to write to test_memory_limit.in file");
+        match launch(
+            &path::Path::new("bash"),
+            input_file.as_path(),
+            &Limit::new(1.0, 64.0),
+        )
+        .0
+        {
+            LaunchReport::MLE => {}
+            _ => panic!("Failed when test memory limit"),
+        }
+        fs::remove_file(&input_file).expect("Failed to delete input file after testing");
     }
 
     #[test]
