@@ -10,7 +10,7 @@ RUN apt-get update && \
     cd /lrun && \
     make
 
-FROM rustlang/rust:nightly-slim AS build_ana
+FROM rust:latest AS build_ana
 COPY Cargo.toml /Ana/
 COPY src/ /Ana/src
 RUN apt-get update && \
