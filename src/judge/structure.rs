@@ -2,12 +2,12 @@ use std::fmt;
 
 pub struct JudgeReport {
     pub status: JudgeResult,
-    pub time: f64,
+    pub time: u64,
     pub memory: u64,
 }
 
 impl JudgeReport {
-    pub fn new(status: JudgeResult, time: f64, memory: u64) -> JudgeReport {
+    pub fn new(status: JudgeResult, time: u64, memory: u64) -> JudgeReport {
         JudgeReport {
             status,
             time,

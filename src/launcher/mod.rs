@@ -1,119 +1,110 @@
-use std::env;
 use std::fs;
+use std::io;
 use std::path;
 use std::process;
+use std::thread;
+use std::time;
 
-mod limit;
-mod report;
+mod cgroup;
 
-pub use self::{
-    limit::Limit,
-    report::{LaunchReport, LrunExceed, LrunReport},
-};
-
-fn create_lrun_log_file() -> Box<path::Path> {
-    let mut lrun_log = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
-    lrun_log.push(env::var("ANA_JUDGE_ID").unwrap());
-    lrun_log.set_extension("log");
-    lrun_log.into_boxed_path()
+#[derive(Debug)]
+pub enum LaunchResult {
+    Pass,
+    TLE,
+    MLE,
+    OLE,
+    RE,
 }
 
-fn create_output_file() -> Box<path::Path> {
-    let mut output_file = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
-    output_file.push(env::var("ANA_JUDGE_ID").unwrap());
-    output_file.set_extension("out");
-    output_file.into_boxed_path()
+pub struct Report {
+    pub status: LaunchResult,
+    pub time: u64,   // us
+    pub memory: u64, // bytes
 }
 
 pub fn launch(
     executable_file: &path::Path,
     input_file: &path::Path,
-    limit: &Limit,
-) -> (LaunchReport, LrunReport) {
-    let lrun_log = create_lrun_log_file();
-    let output_file = create_output_file();
+    output_file: &path::Path,
+    time_limit: u64,   // us
+    memory_limit: u64, // bytes
+) -> io::Result<Report> {
+    let mut limit = cgroup::Cgroup::new(time_limit, memory_limit)?;
+    let mut child = process::Command::new(&executable_file)
+        .stdin(fs::File::open(&input_file)?)
+        .stdout(fs::File::create(&output_file)?)
+        .spawn()
+        .unwrap();
+    let child_pid = child.id();
+    limit.set_task(child_pid)?;
 
-    let status = process::Command::new("sudo") // lrun need root user to be executed
-        .arg("bash")
-        .arg("-c")
-        .arg(format!(
-            "{} --max-cpu-time {} --max-real-time {} --max-memory {} --network false {} 3> {}",
-            "lrun --uid 65534 --gid 65534", // 65534 is the id of nobody on my computer
-            limit.time,
-            limit.time + 0.1,
-            limit.memory * 1024.0 * 1024.0,
-            executable_file
-                .to_str()
-                .expect("Failed to format executable file"),
-            lrun_log.to_str().expect("Failed to format lrun log file"),
-        ))
-        .stdin(fs::File::open(&input_file).expect("Failed to open input file"))
-        .stdout(fs::File::create(&output_file).expect("Failed to create output file"))
-        .status()
-        .expect("Failed to spawn chile process");
+    thread::spawn(move || {
+        thread::sleep(time::Duration::from_micros(time_limit + 1000));
+        unsafe {
+            libc::kill(child_pid as i32, libc::SIGKILL);
+        }
+    });
 
-    assert!(status.success(), "Failed to run lrun");
+    let status = child.wait()?;
+    let (time, memory) = limit.report()?;
 
-    let report = LrunReport::from_log_file(&lrun_log);
+    let status = {
+        if time / 1000 > time_limit {
+            LaunchResult::TLE
+        } else if memory > memory_limit {
+            LaunchResult::MLE
+        } else if status.success() {
+            LaunchResult::Pass
+        } else {
+            LaunchResult::RE
+        }
+    };
 
-    (
-        match report.exceed {
-            LrunExceed::Pass => {
-                if report.exit_code == 0 {
-                    LaunchReport::Pass(output_file)
-                } else {
-                    LaunchReport::RE
-                }
-            }
-            LrunExceed::CpuTime | LrunExceed::RealTime => LaunchReport::TLE,
-            LrunExceed::Memory => LaunchReport::MLE,
-            LrunExceed::Output => LaunchReport::OLE,
-        },
-        report,
-    )
+    Ok(Report {
+        status: status,
+        time: time,
+        memory: memory,
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    // FIXME: This tests fail sometime. But work well most of time.
-
     use super::*;
+    use std::env;
+    use std::fs;
+    use std::io;
     use std::io::prelude::*;
 
-    fn set_test_environments() {
-        env::set_var("ANA_WORK_DIR", env::temp_dir());
-        env::set_var("ANA_JUDGE_ID", "test_judge_id");
-    }
-
     #[test]
-    fn test_launcher() {
-        set_test_environments();
+    fn test_launcher() -> io::Result<()> {
+        env::set_var("ANA_WORK_DIR", env::temp_dir());
+        env::set_var("ANA_JUDGE_ID", "test_launcher");
 
-        let mut input_file = env::temp_dir();
-        input_file.push("test_launcher");
-        input_file.set_extension("in");
-        fs::File::create(&input_file)
-            .expect("Failed to create test_launcher.in file")
-            .write_all("echo hello world".as_bytes())
-            .expect("Failed to write to test_launcher.in file");
+        let input_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_launcher.in");
+        let output_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_launcher.out");
+
+        fs::File::create(&input_file)?.write_all(b"echo hello world")?;
         match launch(
             &path::Path::new("bash"),
-            input_file.as_path(),
-            &Limit::new(1.0, 64.0),
-        )
-        .0
+            &input_file,
+            &output_file,
+            1000000,          // 1 Sec
+            64 * 1024 * 1024, // 64 Mb
+        )?
+        .status
         {
-            LaunchReport::Pass(output_file) => {
+            LaunchResult::Pass => {
                 let mut output = String::new();
-                fs::File::open(output_file)
-                    .expect("Failed to open output file")
-                    .read_to_string(&mut output)
-                    .expect("Failed to read output from file");
-                assert_eq!(output, "hello world\n")
+                fs::File::open(&output_file)?.read_to_string(&mut output)?;
+                assert_eq!(output, "hello world\n");
             }
-            _ => panic!("Failed when execute program"),
+            _ => panic!("Failed to execute program"),
         }
-        fs::remove_file(&input_file).expect("Failed to delete input file after testing");
+        fs::remove_file(&input_file)?;
+        fs::remove_file(&output_file)?;
+        Ok(())
     }
 
     #[test]
@@ -122,50 +113,56 @@ mod tests {
     }
 
     #[test]
-    fn test_time_limit() {
-        set_test_environments();
+    fn test_time_limit() -> io::Result<()> {
+        env::set_var("ANA_WORK_DIR", env::temp_dir());
+        env::set_var("ANA_JUDGE_ID", "test_time_limit");
 
-        let mut input_file = env::temp_dir();
-        input_file.push("test_time_limit");
-        input_file.set_extension("in");
-        fs::File::create(&input_file)
-            .expect("Failed to create test_time_limit.in file")
-            .write_all("while true; do echo -n; done".as_bytes())
-            .expect("Failed to write to test_time_limit.in file");
+        let input_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_time_limit.in");
+        let output_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_time_limit.out");
+        fs::File::create(&input_file)?.write_all(b"while true; do echo -n; done")?;
         match launch(
             &path::Path::new("bash"),
-            input_file.as_path(),
-            &Limit::new(1.0, 64.0),
-        )
-        .0
+            &input_file,
+            &output_file,
+            1000000,          // 1 Sec
+            64 * 1024 * 1024, // 64 Mb
+        )?
+        .status
         {
-            LaunchReport::TLE => {}
+            LaunchResult::TLE => {}
             _ => panic!("Failed when test time limit"),
         }
-        fs::remove_file(&input_file).expect("Failed to delete input file after testing");
+        fs::remove_file(&input_file)?;
+        fs::remove_file(&output_file)?;
+        Ok(())
     }
 
     #[test]
-    fn test_runtime_error() {
-        set_test_environments();
+    fn test_runtime_error() -> io::Result<()> {
+        env::set_var("ANA_WORK_DIR", env::temp_dir());
+        env::set_var("ANA_JUDGE_ID", "test_runtime_error");
 
-        let mut input_file = env::temp_dir();
-        input_file.push("test_runtime_error");
-        input_file.set_extension("in");
-        fs::File::create(&input_file)
-            .expect("Failed to create test_runtime_error.in file")
-            .write_all("exit 1".as_bytes())
-            .expect("Failed to write to test_runtime_error.in file");
+        let input_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_runtime_error.in");
+        let output_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_runtime_error.out");
+        fs::File::create(&input_file)?.write_all(b"exit 1")?;
         match launch(
             &path::Path::new("bash"),
-            input_file.as_path(),
-            &Limit::new(1.0, 64.0),
-        )
-        .0
+            &input_file,
+            &output_file,
+            1000000,          // 1 Sec
+            64 * 1024 * 1024, // 64 Mb
+        )?
+        .status
         {
-            LaunchReport::RE => {}
+            LaunchResult::RE => {}
             _ => panic!("Failed when test runtime error"),
         }
-        fs::remove_file(&input_file).expect("Failed to delete input file after testing");
+        fs::remove_file(&input_file)?;
+        fs::remove_file(&output_file)?;
+        Ok(())
     }
 }

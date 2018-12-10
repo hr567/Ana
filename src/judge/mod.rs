@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io;
 use std::io::prelude::*;
 use std::path;
 use std::sync;
@@ -7,7 +8,7 @@ use std::sync;
 use super::{
     compare::Comparer,
     compiler::Compiler,
-    launcher::{launch, LaunchReport, Limit},
+    launcher::{launch, LaunchResult},
     mtp::{JudgeInfo, Problem, ProblemType, TestCase},
 };
 
@@ -22,9 +23,10 @@ fn create_executable_filename(id: &str) -> Box<path::Path> {
     executable_file.into_boxed_path()
 }
 
-fn prepare_problem(problem: &Problem) -> (Limit, &Vec<TestCase>, Option<Box<path::Path>>) {
+fn prepare_problem(problem: &Problem) -> (u64, u64, &Vec<TestCase>, Option<Box<path::Path>>) {
     (
-        Limit::new(problem.time_limit, problem.memory_limit),
+        (problem.time_limit * 1000.0 * 1000.0) as u64, // Convert to us
+        (problem.memory_limit * 1024.0 * 1024.0) as u64, // Convert to bytes
         &problem.test_cases,
         match problem.get_type() {
             ProblemType::Normal => None,
@@ -61,28 +63,43 @@ fn prepare_test_case(test_case: &TestCase) -> (Box<path::Path>, Box<path::Path>)
     (input_file.into_boxed_path(), answer_file.into_boxed_path())
 }
 
+fn create_output_file() -> Box<path::Path> {
+    let mut output_file = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
+    output_file.push(env::var("ANA_JUDGE_ID").unwrap());
+    output_file.set_extension("out");
+    output_file.into_boxed_path()
+}
+
 fn judge_per_test_case(
     executable_file: &path::Path,
     input_file: &path::Path,
     answer_file: &path::Path,
-    limit: &Limit,
+    time_limit: u64,
+    memory_limit: u64,
     spj: &Option<&path::Path>,
-) -> JudgeReport {
-    let (result, report) = launch(executable_file, input_file, limit);
-    let judge_result = match result {
-        LaunchReport::Pass(output_file) => {
+) -> io::Result<JudgeReport> {
+    let output_file = create_output_file();
+    let report = launch(
+        executable_file,
+        &input_file,
+        &output_file,
+        time_limit,
+        memory_limit,
+    )?;
+    let judge_result = match &report.status {
+        LaunchResult::Pass => {
             if Comparer::check(&input_file, &output_file, &answer_file, &spj) {
                 JudgeResult::AC
             } else {
                 JudgeResult::WA
             }
         }
-        LaunchReport::RE => JudgeResult::RE,
-        LaunchReport::MLE => JudgeResult::MLE,
-        LaunchReport::TLE => JudgeResult::TLE,
-        LaunchReport::OLE => JudgeResult::OLE,
+        LaunchResult::RE => JudgeResult::RE,
+        LaunchResult::MLE => JudgeResult::MLE,
+        LaunchResult::TLE => JudgeResult::TLE,
+        LaunchResult::OLE => JudgeResult::OLE,
     };
-    JudgeReport::new(judge_result, report.cpu_time, report.memory)
+    Ok(JudgeReport::new(judge_result, report.time, report.memory))
 }
 
 pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
@@ -95,24 +112,26 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
     .is_err()
     {
         sender
-            .send(JudgeReport::new(JudgeResult::CE, 0.0, 0))
+            .send(JudgeReport::new(JudgeResult::CE, 0, 0))
             .expect("Cannot send the result to receiver");
         return;
     };
 
-    let (limit, test_cases, spj) = prepare_problem(&judge_info.problem);
+    let (time_limit, memory_limit, test_cases, spj) = prepare_problem(&judge_info.problem);
     for test_case in test_cases {
         let (input_file, answer_file) = prepare_test_case(test_case);
         let judge_result = judge_per_test_case(
             &executable_file,
             &input_file,
             &answer_file,
-            &limit,
+            time_limit,
+            memory_limit,
             &match spj {
                 Some(ref spj) => Some(spj.as_ref()),
                 None => None,
             },
-        );
+        )
+        .expect("Failed when judging");
         sender
             .send(judge_result)
             .expect("Cannot send the result to receiver");

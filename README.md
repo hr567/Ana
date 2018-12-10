@@ -67,7 +67,7 @@ is defined as following examples:
     "problem": {
       "problem_type": "normal",
       "time_limit": 1.0,
-      "memory_limit": 32.0,
+      "memory_limit": 33554432,
       "checker": {
         "language": "",
         "code": ""
@@ -102,7 +102,7 @@ is defined as following examples:
     "problem": {
       "problem_type": "spj",
       "time_limit": 1.0,
-      "memory_limit": 32.0,
+      "memory_limit": 33554432,
       "checker": {
         "language": "cpp.gxx",
         "code": "..."

@@ -2,16 +2,14 @@ use std::env;
 use std::sync::mpsc;
 use std::thread::spawn;
 
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate zmq;
-
 mod compare;
 mod compiler;
 mod judge;
 mod launcher;
 mod mtp;
+
+const US_PER_SEC: f64 = (1000 * 1000) as f64;
+const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 
 fn main() {
     env::set_var(
@@ -43,7 +41,7 @@ fn main() {
 
     env::set_var("ANA_JUDGE_ID", &judge_info.id);
     let mut summary_report =
-        mtp::ReportInfo::new(0, &judge::JudgeReport::new(judge::JudgeResult::AC, 0.0, 0));
+        mtp::ReportInfo::new(0, &judge::JudgeReport::new(judge::JudgeResult::AC, 0, 0));
 
     let (channel_sender, channel_receiver) = mpsc::channel::<judge::JudgeReport>();
 
@@ -55,15 +53,16 @@ fn main() {
         sender
             .send_str(&mtp::ReportInfo::new(index, &report).to_json(), 0)
             .unwrap();
+
         summary_report.case_index += 1;
         if summary_report.status == "AC" {
             summary_report.status = report.status.to_string();
         }
-        if report.time > summary_report.time {
-            summary_report.time = report.time;
+        if report.time as f64 / US_PER_SEC > summary_report.time {
+            summary_report.time = report.time as f64 / US_PER_SEC;
         }
-        if report.memory > summary_report.memory {
-            summary_report.memory = report.memory;
+        if report.memory as f64 / BYTES_PER_MB > summary_report.memory {
+            summary_report.memory = report.memory as f64 / BYTES_PER_MB;
         }
     }
     sender.send_str(&summary_report.to_json(), 0).unwrap();
