@@ -22,14 +22,24 @@ impl Cgroup {
             .join(env::var("ANA_JUDGE_ID").unwrap());
 
         fs::create_dir(&cgroup_cpu_fs)?;
-        let cpu_period = cgroup_cpu_fs.join("cpu.cfs_period_us");
-        fs::write(&cpu_period, &format!("{}", time))?;
-        let cpu_quota = cgroup_cpu_fs.join("cpu.cfs_quota_us");
-        fs::write(&cpu_quota, &format!("{}", time))?;
+        fs::write(
+            &cgroup_cpu_fs.join("cpu.cfs_period_us"),
+            &format!("{}", time),
+        )?;
+        fs::write(
+            &cgroup_cpu_fs.join("cpu.cfs_quota_us"),
+            &format!("{}", time),
+        )?;
 
         fs::create_dir(&cgroup_memory_fs)?;
-        let memory_limit = cgroup_memory_fs.join("memory.limit_in_bytes");
-        fs::write(&memory_limit, &format!("{}", memory))?;
+        fs::write(
+            &cgroup_memory_fs.join("memory.limit_in_bytes"),
+            &format!("{}", memory),
+        )?;
+        fs::write(
+            &cgroup_memory_fs.join("memory.swappiness"),
+            &format!("{}", 0),
+        )?;
 
         Ok(Cgroup {
             cgroup_cpu_fs: cgroup_cpu_fs.into_boxed_path(),
