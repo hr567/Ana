@@ -48,16 +48,14 @@ pub fn launch(
     let status = child.wait()?;
     let (time, memory) = limit.report()?;
 
-    let status = {
-        if memory >= memory_limit {
-            LaunchResult::MLE
-        } else if time >= time_limit {
-            LaunchResult::TLE
-        } else if status.success() {
-            LaunchResult::Pass
-        } else {
-            LaunchResult::RE
-        }
+    let status = if memory >= memory_limit {
+        LaunchResult::MLE
+    } else if time >= time_limit {
+        LaunchResult::TLE
+    } else if status.success() {
+        LaunchResult::Pass
+    } else {
+        LaunchResult::RE
     };
 
     Ok(Report {

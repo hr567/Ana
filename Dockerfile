@@ -1,6 +1,7 @@
 FROM rust:slim AS build
 COPY Cargo.toml /Ana/
 COPY src/ /Ana/src
+COPY .cargo/ /Ana/
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
