@@ -70,14 +70,14 @@ class AnaTest(unittest.TestCase):
             self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "AC")
             self.assertLessEqual(report["time"], 1.0)
-            self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+            self.assertLessEqual(report["memory"], 32.0)
         report = self.receiver.recv().decode()
         report = json.loads(report)
         self.assertEqual(report["id"], json.loads(judge_info)["id"])
         self.assertEqual(report["case_index"], PROBLEM_TEST_CASE_COUNT)
         self.assertEqual(report["status"], "AC")
         self.assertLessEqual(report["time"], 1.0)
-        self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+        self.assertLessEqual(report["memory"], 32.0)
         self.assertEqual(self.container.wait(timeout=5)["StatusCode"], 0)
 
     def test_mle(self):
@@ -96,7 +96,7 @@ class AnaTest(unittest.TestCase):
             self.assertEqual(report["status"], "MLE")
             self.assertLessEqual(report["time"], 1.0)
             self.assertAlmostEqual(
-                report["memory"], 32 * 1024 * 1024, delta=1024)
+                report["memory"], 32.0, delta=0.01)
         report = self.receiver.recv().decode()
         report = json.loads(report)
         self.assertEqual(report["id"], json.loads(judge_info)["id"])
@@ -104,7 +104,7 @@ class AnaTest(unittest.TestCase):
         self.assertEqual(report["status"], "MLE")
         self.assertLessEqual(report["time"], 1.0)
         self.assertAlmostEqual(
-            report["memory"], 32 * 1024 * 1024, delta=1024)
+            report["memory"], 32.0, delta=0.01)
         self.assertEqual(self.container.wait(timeout=5)["StatusCode"], 0)
 
     def test_re(self):
@@ -122,14 +122,14 @@ class AnaTest(unittest.TestCase):
             self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "RE")
             self.assertLessEqual(report["time"], 1.0)
-            self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+            self.assertLessEqual(report["memory"], 32.0)
         report = self.receiver.recv().decode()
         report = json.loads(report)
         self.assertEqual(report["id"], json.loads(judge_info)["id"])
         self.assertEqual(report["case_index"], PROBLEM_TEST_CASE_COUNT)
         self.assertEqual(report["status"], "RE")
         self.assertLessEqual(report["time"], 1.0)
-        self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+        self.assertLessEqual(report["memory"], 32.0)
         self.assertEqual(self.container.wait(timeout=5)["StatusCode"], 0)
 
     def test_tle(self):
@@ -147,14 +147,14 @@ class AnaTest(unittest.TestCase):
             self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "TLE")
             self.assertAlmostEqual(report["time"], 1.0, delta=0.05)
-            self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+            self.assertLessEqual(report["memory"], 32.0)
         report = self.receiver.recv().decode()
         report = json.loads(report)
         self.assertEqual(report["id"], json.loads(judge_info)["id"])
         self.assertEqual(report["case_index"], PROBLEM_TEST_CASE_COUNT)
         self.assertEqual(report["status"], "TLE")
         self.assertAlmostEqual(report["time"], 1.0, delta=0.05)
-        self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+        self.assertLessEqual(report["memory"], 32.0)
         self.assertEqual(self.container.wait(timeout=5)["StatusCode"], 0)
 
     def test_wa(self):
@@ -172,14 +172,14 @@ class AnaTest(unittest.TestCase):
             self.assertEqual(report["case_index"], i)
             self.assertEqual(report["status"], "WA")
             self.assertLessEqual(report["time"], 1.0)
-            self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+            self.assertLessEqual(report["memory"], 32.0)
         report = self.receiver.recv().decode()
         report = json.loads(report)
         self.assertEqual(report["id"], json.loads(judge_info)["id"])
         self.assertEqual(report["case_index"], PROBLEM_TEST_CASE_COUNT)
         self.assertEqual(report["status"], "WA")
         self.assertLessEqual(report["time"], 1.0)
-        self.assertLessEqual(report["memory"], 32 * 1024 * 1024)
+        self.assertLessEqual(report["memory"], 32.0)
         self.assertEqual(self.container.wait(timeout=5)["StatusCode"], 0)
 
 

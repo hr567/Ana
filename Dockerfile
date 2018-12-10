@@ -1,4 +1,4 @@
-FROM rust:latest AS build
+FROM rust:slim AS build
 COPY Cargo.toml /Ana/
 COPY src/ /Ana/src
 RUN apt-get update && \
