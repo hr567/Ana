@@ -6,4 +6,4 @@ rust:
   image: rustlang/rust:nightly
   script:
     - cargo build --verbose
-    - cargo test --verbose
+    - cargo test --verbose -- --test-threads=1
