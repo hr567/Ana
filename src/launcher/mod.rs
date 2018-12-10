@@ -108,8 +108,31 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_limit() {
-        unimplemented!("TODO: How to test memory")
+    fn test_memory_limit() -> io::Result<()> {
+        env::set_var("ANA_WORK_DIR", env::temp_dir());
+        env::set_var("ANA_JUDGE_ID", "test_launcher");
+
+        let input_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_launcher.in");
+        let output_file =
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_launcher.out");
+
+        fs::File::create(&input_file)?.write_all(b"x='a'; while true; do x=$x$x; done")?;
+        match launch(
+            &path::Path::new("bash"),
+            &input_file,
+            &output_file,
+            1000000,          // 1 Sec
+            64 * 1024 * 1024, // 64 Mb
+        )?
+        .status
+        {
+            LaunchResult::MLE => {}
+            _ => panic!("Failed when test memory limit"),
+        }
+        fs::remove_file(&input_file)?;
+        fs::remove_file(&output_file)?;
+        Ok(())
     }
 
     #[test]

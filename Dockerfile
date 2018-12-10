@@ -6,8 +6,8 @@ RUN apt-get update && \
     libzmq3-dev \
     libclang-dev \
     pkg-config \
-    clang && \
-    cd /Ana && \
+    clang
+RUN cd /Ana && \
     cargo build -v --release
 
 FROM ubuntu:18.04
