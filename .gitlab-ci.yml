@@ -1,10 +1,9 @@
 stages:
   - build
 
-rust-nightly:
+rust:
   stage: build
   image: rustlang/rust:nightly
   script:
     - cargo build --verbose
     - cargo test --verbose
-  allow_failure: true
