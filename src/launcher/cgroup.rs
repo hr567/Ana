@@ -50,11 +50,11 @@ impl Cgroup {
         let cpu_usage: u64 = cpu_usage.trim().parse().unwrap();
 
         let mut memory_usage = String::new();
-        fs::File::open(&self.cgroup_memory_fs.join("memory.usage_in_bytes"))?
+        fs::File::open(&self.cgroup_memory_fs.join("memory.max_usage_in_bytes"))?
             .read_to_string(&mut memory_usage)?;
         let memory_usage: u64 = memory_usage.trim().parse().unwrap();
 
-        Ok((cpu_usage, memory_usage))
+        Ok((cpu_usage / 1000, memory_usage))
     }
 }
 

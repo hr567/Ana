@@ -49,10 +49,10 @@ pub fn launch(
     let (time, memory) = limit.report()?;
 
     let status = {
-        if time / 1000 > time_limit {
-            LaunchResult::TLE
-        } else if memory > memory_limit {
+        if memory >= memory_limit {
             LaunchResult::MLE
+        } else if time >= time_limit {
+            LaunchResult::TLE
         } else if status.success() {
             LaunchResult::Pass
         } else {
@@ -110,23 +110,23 @@ mod tests {
     #[test]
     fn test_memory_limit() -> io::Result<()> {
         env::set_var("ANA_WORK_DIR", env::temp_dir());
-        env::set_var("ANA_JUDGE_ID", "test_launcher");
+        env::set_var("ANA_JUDGE_ID", "test_memory_limit");
 
         let input_file =
-            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_launcher.in");
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_memory_limit.in");
         let output_file =
-            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_launcher.out");
+            path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_memory_limit.out");
 
         fs::File::create(&input_file)?.write_all(b"x='a'; while true; do x=$x$x; done")?;
-        match launch(
+        let status = launch(
             &path::Path::new("bash"),
             &input_file,
             &output_file,
             1000000,          // 1 Sec
             64 * 1024 * 1024, // 64 Mb
-        )?
-        .status
-        {
+        )?;
+        println!("### {} {}", status.time, status.memory);
+        match status.status {
             LaunchResult::MLE => {}
             _ => panic!("Failed when test memory limit"),
         }
