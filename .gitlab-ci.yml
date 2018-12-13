@@ -19,6 +19,8 @@ build:
         software-properties-common
         libzmq3-dev
         pkg-config
+        gcc
+        g++
     - curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
     - add-apt-repository
         "deb [arch=amd64] https://download.docker.com/linux/debian
