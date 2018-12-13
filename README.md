@@ -20,7 +20,6 @@ To build Ana at local:
 
 * Rust toolchain (Edition 2018 or higher)
 * ZeroMQ (such as libzmq-dev)
-* lrun (https://github.com/quark-zju/lrun)
 
 
 ## Usage
@@ -32,17 +31,17 @@ To build Ana at local:
 After build the image,
 test it using:
 
-`python3 tests/basic_test.py`
+`cargo test -- --test-threads=1`
 
-`python3 tests/spj_test.0.py`
+Please note that testing Ana needs root permission
+to read and write to cgroups.
 
-`python3 tests/spj_test.1.py`
+And if test it without --test-threads=1 flag,
+the test will fail due to the launcher test doesn't
+support concurrent tasks.
 
-### Normal
-
-Use `cargo test` to run unit test.
-
-`cargo run` to run ana on the localhost.
+`cargo run` to run Ana on the localhost.
+Needs root permission too.
 
 
 ## MTP
