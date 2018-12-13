@@ -2,11 +2,7 @@ use std::env;
 use std::sync::mpsc;
 use std::thread::spawn;
 
-mod compare;
-mod compiler;
-mod judge;
-mod launcher;
-mod mtp;
+use ana::*;
 
 const US_PER_SEC: f64 = (1000 * 1000) as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;

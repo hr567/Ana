@@ -24,6 +24,10 @@ impl Problem {
             _ => unimplemented!("Not support problem type {}", self.problem_type),
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.test_cases.len()
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

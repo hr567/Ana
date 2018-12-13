@@ -1,9 +1,19 @@
-stages:
-  - build
+image: docker:stable
 
-rust:
+variables:
+  DOCKER_HOST: tcp://docker:2375/
+  DOCKER_DRIVER: overlay2
+
+services:
+  - docker:dind
+
+before_script:
+  - docker info
+
+build:
   stage: build
-  image: rustlang/rust:nightly
   script:
-    - cargo build --verbose
-    - cargo test --verbose -- --test-threads=1
+    - docker build -t hr567/ana .
+    - apt-get update
+    - apt-get upgrade -y
+    - apt-get install -y python python-venv

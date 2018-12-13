@@ -39,7 +39,7 @@ pub fn launch(
     limit.set_task(child_pid)?;
 
     thread::spawn(move || {
-        thread::sleep(time::Duration::from_micros(time_limit + 1000));
+        thread::sleep(time::Duration::from_micros(time_limit + time_limit / 100));
         unsafe {
             libc::kill(child_pid as i32, libc::SIGKILL);
         }
