@@ -12,8 +12,7 @@ before_script:
 
 build:
   stage: build
-  script:
+  before_script:
     - docker build -t hr567/ana .
-    - apt-get update
-    - apt-get upgrade -y
-    - apt-get install -y python python-venv
+  script:
+    - cargo test -- --test-threads=1
