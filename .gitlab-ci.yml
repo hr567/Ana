@@ -12,7 +12,6 @@ before_script:
 
 build:
   stage: build
-  before_script:
-    - docker build -t hr567/ana .
   script:
+    - docker build -t hr567/ana .
     - cargo test -- --test-threads=1
