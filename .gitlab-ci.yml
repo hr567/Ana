@@ -13,5 +13,6 @@ before_script:
 build:
   stage: build
   script:
+    - curl https://sh.rustup.rs -sSf | sh -s -- -v -y --default-toolchain stable
     - docker build -t hr567/ana .
     - cargo test -- --test-threads=1

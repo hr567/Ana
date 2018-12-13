@@ -1,5 +1,7 @@
 # [Ana Project](https://gitlab.com/hr567/Ana)
 
+[![pipeline status](https://gitlab.com/hr567/Ana/badges/master/pipeline.svg)](https://gitlab.com/hr567/Ana/commits/master)
+
 A open source judge for ACMers in Rust
 
 
