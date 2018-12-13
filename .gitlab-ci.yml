@@ -29,4 +29,4 @@ build:
     - apt-get update
     - apt-get install -y docker-ce
     - docker build -t hr567/ana .
-    - cargo test -- --test-threads=1
+    - cargo test -- --test-threads=1 --nocapture
