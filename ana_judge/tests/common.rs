@@ -7,7 +7,7 @@ use serde_json;
 use uuid::prelude::*;
 use zmq;
 
-use ana::*;
+use ana_mtp as mtp;
 
 pub struct Container {
     id: String,
@@ -99,7 +99,7 @@ pub fn generate_judge_info<T: AsRef<path::Path>>(
     source_file: T,
     problem_file: T,
     spj_source_file: Option<T>,
-) -> io::Result<ana::mtp::JudgeInfo> {
+) -> io::Result<mtp::JudgeInfo> {
     let source = mtp::Source {
         language: String::from("cpp.gxx"),
         code: String::from_utf8(fs::read(&source_file)?).unwrap(),

@@ -2,7 +2,7 @@ use std::io;
 
 use serde_json;
 
-use ana::*;
+use ana_mtp as mtp;
 
 mod common;
 use self::common::{check_report_with_limit, Communicator, Container};

@@ -1,5 +1,3 @@
-use super::judge::JudgeReport;
-
 mod judge;
 mod problem;
 mod report;

@@ -3,7 +3,7 @@ use std::io::prelude::*;
 use std::path;
 use std::process;
 
-pub struct Comparer {}
+pub struct Comparer;
 
 fn diff(output: &str, answer: &str) -> bool {
     !output

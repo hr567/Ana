@@ -104,12 +104,12 @@ fn judge_per_test_case(
 
 pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
     let executable_file = create_executable_filename(&judge_info.id);
-    if Compiler::compile(
+    if !Compiler::compile(
         &judge_info.source.language,
         &judge_info.source.code,
         &executable_file,
     )
-    .is_err()
+    .expect("Self error when compiling source")
     {
         sender
             .send(JudgeReport::new(JudgeResult::CE, 0, 0))

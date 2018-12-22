@@ -1,9 +1,10 @@
 use std::fs;
 use std::io;
 use std::path;
-use std::process;
 use std::thread;
 use std::time;
+
+use unshare;
 
 mod cgroup;
 
@@ -30,11 +31,18 @@ pub fn launch(
     memory_limit: u64, // bytes
 ) -> io::Result<Report> {
     let mut limit = cgroup::Cgroup::new(time_limit, memory_limit)?;
-    let mut child = process::Command::new(&executable_file)
-        .stdin(fs::File::open(&input_file)?)
-        .stdout(fs::File::create(&output_file)?)
+    let mut child = unshare::Command::new(&executable_file)
+        .stdin(unshare::Stdio::from_file(fs::File::open(&input_file)?))
+        .stdout(unshare::Stdio::from_file(fs::File::create(&output_file)?))
+        .unshare(&[
+            unshare::Namespace::Cgroup,
+            unshare::Namespace::Net,
+            unshare::Namespace::Pid,
+            unshare::Namespace::User,
+        ])
         .spawn()
         .unwrap();
+
     let child_pid = child.id();
     limit.set_task(child_pid)?;
 
@@ -85,7 +93,7 @@ mod tests {
 
         fs::File::create(&input_file)?.write_all(b"echo hello world")?;
         match launch(
-            &path::Path::new("bash"),
+            &path::Path::new("/bin/bash"),
             &input_file,
             &output_file,
             1000000,          // 1 Sec
@@ -117,7 +125,7 @@ mod tests {
 
         fs::File::create(&input_file)?.write_all(b"x='a'; while true; do x=$x$x; done")?;
         let status = launch(
-            &path::Path::new("bash"),
+            &path::Path::new("/bin/bash"),
             &input_file,
             &output_file,
             1000000,          // 1 Sec
@@ -144,7 +152,7 @@ mod tests {
             path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_time_limit.out");
         fs::File::create(&input_file)?.write_all(b"while true; do echo -n; done")?;
         match launch(
-            &path::Path::new("bash"),
+            &path::Path::new("/bin/bash"),
             &input_file,
             &output_file,
             1000000,          // 1 Sec
@@ -171,7 +179,7 @@ mod tests {
             path::Path::new(&env::var("ANA_WORK_DIR").unwrap()).join("test_runtime_error.out");
         fs::File::create(&input_file)?.write_all(b"exit 1")?;
         match launch(
-            &path::Path::new("bash"),
+            &path::Path::new("/bin/bash"),
             &input_file,
             &output_file,
             1000000,          // 1 Sec

@@ -2,7 +2,12 @@ use std::env;
 use std::sync::mpsc;
 use std::thread::spawn;
 
-use ana::*;
+pub use ana_compiler as compiler;
+pub use ana_launcher as launcher;
+pub use ana_mtp as mtp;
+
+pub mod compare;
+pub mod judge;
 
 const US_PER_SEC: f64 = (1000 * 1000) as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
@@ -36,8 +41,13 @@ fn main() {
         .expect("Judge information is invalid. Check it at server");
 
     env::set_var("ANA_JUDGE_ID", &judge_info.id);
-    let mut summary_report =
-        mtp::ReportInfo::new(0, &judge::JudgeReport::new(judge::JudgeResult::AC, 0, 0));
+    let mut summary_report = mtp::ReportInfo::new(
+        &env::var("ANA_JUDGE_ID").unwrap(),
+        0,
+        &judge::JudgeResult::AC.to_string(),
+        0.0,
+        0.0,
+    );
 
     let (channel_sender, channel_receiver) = mpsc::channel::<judge::JudgeReport>();
 
@@ -47,7 +57,17 @@ fn main() {
 
     for (index, report) in channel_receiver.iter().enumerate() {
         sender
-            .send_str(&mtp::ReportInfo::new(index, &report).to_json(), 0)
+            .send_str(
+                &mtp::ReportInfo::new(
+                    &env::var("ANA_JUDGE_ID").unwrap(),
+                    index,
+                    &report.status.to_string(),
+                    report.time as f64,
+                    report.memory as f64,
+                )
+                .to_json(),
+                0,
+            )
             .unwrap();
 
         summary_report.case_index += 1;
