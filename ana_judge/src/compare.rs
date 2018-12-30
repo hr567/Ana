@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::io::prelude::*;
 use std::path;
 use std::process;
@@ -19,29 +20,20 @@ impl Comparer {
         output_file: &path::Path,
         answer_file: &path::Path,
         spj: &Option<&path::Path>,
-    ) -> bool {
+    ) -> io::Result<bool> {
         match spj {
-            Some(spj) => process::Command::new(spj)
+            Some(spj) => Ok(process::Command::new(spj)
                 .arg(input_file)
                 .arg(answer_file)
                 .arg(output_file)
-                .status()
-                .expect("Failed to run special judge")
-                .success(),
+                .status()?
+                .success()),
             None => {
                 let mut output = String::new();
-                fs::File::open(output_file)
-                    .expect("Failed to open output file")
-                    .read_to_string(&mut output)
-                    .expect("Failed to read output content to string");
-
+                fs::File::open(output_file)?.read_to_string(&mut output)?;
                 let mut answer = String::new();
-                fs::File::open(answer_file)
-                    .expect("Failed to open answer file")
-                    .read_to_string(&mut answer)
-                    .expect("Failed to read answer content to string");
-
-                !diff(&output, &answer)
+                fs::File::open(answer_file)?.read_to_string(&mut answer)?;
+                Ok(!diff(&output, &answer))
             }
         }
     }
@@ -83,37 +75,24 @@ mod tests {
     }
 
     #[test]
-    fn test_check_without_spj() {
-        env::set_var("ANA_WORK_DIR", env::temp_dir());
-        let work_dir = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
-        let mut input_file = path::PathBuf::new();
-        input_file.clone_from(&work_dir);
-        input_file.push("test_check_without_spj");
-        input_file.set_extension("in");
-
-        let mut output_file = path::PathBuf::new();
-        output_file.clone_from(&work_dir);
-        output_file.push("test_check_without_spj");
-        output_file.set_extension("out");
-        fs::File::create(&output_file)
-            .unwrap()
-            .write_all(b"hello world")
-            .unwrap();
-
-        let mut answer_file = path::PathBuf::new();
-        answer_file.clone_from(&work_dir);
-        answer_file.push("test_check_without_spj");
-        answer_file.set_extension("ans");
-        fs::File::create(&answer_file)
-            .unwrap()
-            .write_all(b"hello world")
-            .unwrap();
-
-        assert!(Comparer::check(
-            &input_file,
-            &output_file,
-            &answer_file,
-            &None,
-        ));
+    fn test_check_without_spj() -> io::Result<()> {
+        let file0 = env::temp_dir().join("test_check_without_spj.0");
+        let file1 = env::temp_dir().join("test_check_without_spj.1");
+        let file2 = env::temp_dir().join("test_check_without_spj.2");
+        fs::write(&file0, "hello world")?;
+        fs::write(&file1, "hello world")?;
+        fs::write(&file2, "helloworld")?;
+        assert!(Comparer::check(&env::temp_dir(), &file0, &file1, &None)?);
+        assert!(!Comparer::check(&env::temp_dir(), &file0, &file2, &None)?);
+        fs::remove_file(&file0)?;
+        fs::remove_file(&file1)?;
+        fs::remove_file(&file2)?;
+        Ok(())
     }
+
+    // TODO: Add Spj test
+    // #[test]
+    // fn test_check_with_spj() -> io::Result<()> {
+    //     unimplemented!()
+    // }
 }

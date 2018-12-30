@@ -1,9 +1,9 @@
 use std::env;
 use std::fs;
 use std::io;
-use std::io::prelude::*;
 use std::path;
 use std::sync;
+use std::thread;
 
 use super::{
     compare::Comparer,
@@ -16,11 +16,21 @@ mod structure;
 
 pub use self::structure::{JudgeReport, JudgeResult};
 
-fn create_executable_filename(id: &str) -> Box<path::Path> {
-    let mut executable_file = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
-    executable_file.push(id);
-    executable_file.set_extension("exe");
-    executable_file.into_boxed_path()
+fn current_judge_id() -> String {
+    thread::current()
+        .name()
+        .expect("Unnamed thread. Please set thread name as judge id")
+        .to_string()
+}
+
+fn current_judge_work_dir() -> Box<path::Path> {
+    path::Path::new(&env::var("ANA_WORK_DIR").unwrap())
+        .join(&current_judge_id())
+        .into_boxed_path()
+}
+
+fn create_file(filename: &str) -> Box<path::Path> {
+    current_judge_work_dir().join(filename).into_boxed_path()
 }
 
 fn prepare_problem(problem: &Problem) -> (u64, u64, &Vec<TestCase>, Option<Box<path::Path>>) {
@@ -31,7 +41,7 @@ fn prepare_problem(problem: &Problem) -> (u64, u64, &Vec<TestCase>, Option<Box<p
         match problem.get_type() {
             ProblemType::Normal => None,
             ProblemType::Special => {
-                let spj = create_executable_filename("spj");
+                let spj = create_file("spj");
                 Compiler::compile(&problem.checker.language, &problem.checker.code, &spj)
                     .expect("Failed to build spj");
                 Some(spj)
@@ -41,33 +51,15 @@ fn prepare_problem(problem: &Problem) -> (u64, u64, &Vec<TestCase>, Option<Box<p
 }
 
 fn prepare_test_case(test_case: &TestCase) -> (Box<path::Path>, Box<path::Path>) {
-    let (mut input_file, mut answer_file) = (
-        path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap()),
-        path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap()),
-    );
-
-    input_file.push(env::var("ANA_JUDGE_ID").unwrap());
-    input_file.set_extension("in");
-    fs::File::create(&input_file)
-        .expect("Cannot create input file")
-        .write_all(test_case.input.as_bytes())
+    let input_file = create_file("input");
+    fs::write(&input_file, test_case.input.as_bytes())
         .expect("Cannot write input content to input file");
 
-    answer_file.push(env::var("ANA_JUDGE_ID").unwrap());
-    answer_file.set_extension("ans");
-    fs::File::create(&answer_file)
-        .expect("Cannot create answer file")
-        .write_all(test_case.answer.as_bytes())
+    let answer_file = create_file("answer");
+    fs::write(&answer_file, test_case.answer.as_bytes())
         .expect("Cannot write answer content to answer file");
 
-    (input_file.into_boxed_path(), answer_file.into_boxed_path())
-}
-
-fn create_output_file() -> Box<path::Path> {
-    let mut output_file = path::PathBuf::from(env::var("ANA_WORK_DIR").unwrap());
-    output_file.push(env::var("ANA_JUDGE_ID").unwrap());
-    output_file.set_extension("out");
-    output_file.into_boxed_path()
+    (input_file, answer_file)
 }
 
 fn judge_per_test_case(
@@ -78,9 +70,10 @@ fn judge_per_test_case(
     memory_limit: u64,
     spj: &Option<&path::Path>,
 ) -> io::Result<JudgeReport> {
-    let output_file = create_output_file();
+    let output_file = create_file("output");
     let report = launch(
-        executable_file,
+        &current_judge_id(),
+        &executable_file,
         &input_file,
         &output_file,
         time_limit,
@@ -88,7 +81,7 @@ fn judge_per_test_case(
     )?;
     let judge_result = match &report.status {
         LaunchResult::Pass => {
-            if Comparer::check(&input_file, &output_file, &answer_file, &spj) {
+            if Comparer::check(&input_file, &output_file, &answer_file, &spj)? {
                 JudgeResult::AC
             } else {
                 JudgeResult::WA
@@ -103,7 +96,7 @@ fn judge_per_test_case(
 }
 
 pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
-    let executable_file = create_executable_filename(&judge_info.id);
+    let executable_file = create_file("main");
     if !Compiler::compile(
         &judge_info.source.language,
         &judge_info.source.code,
