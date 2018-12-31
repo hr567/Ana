@@ -48,11 +48,8 @@ fn main() {
             .expect("Judge information is invalid. Check it at server");
 
         let channel_sender = channel_sender.clone();
-        thread::Builder::new()
-            .name(judge_info.id.clone())
-            .spawn(move || {
-                judge::judge(&judge_info, &channel_sender);
-            })
-            .unwrap();
+        thread::spawn(move || {
+            judge::judge(&judge_info, &channel_sender);
+        });
     }
 }

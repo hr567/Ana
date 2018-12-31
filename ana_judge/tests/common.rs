@@ -46,11 +46,22 @@ impl Container {
 
     pub fn kill(&self) -> io::Result<()> {
         process::Command::new("docker")
-            .arg("Container")
+            .arg("container")
             .arg("kill")
             .arg(&self.id)
             .stdout(process::Stdio::null())
             .spawn()?;
+        Ok(())
+    }
+
+    pub fn wait(&self) -> io::Result<()> {
+        process::Command::new("docker")
+            .arg("container")
+            .arg("wait")
+            .arg(&self.id)
+            .stdout(process::Stdio::null())
+            .spawn()?
+            .wait()?;
         Ok(())
     }
 }
@@ -58,6 +69,7 @@ impl Container {
 impl Drop for Container {
     fn drop(&mut self) {
         self.kill().expect("Failed to kill a container");
+        self.wait().expect("Failed to wait a container to exit");
         process::Command::new("docker")
             .arg("container")
             .arg("rm")
@@ -131,6 +143,6 @@ pub fn check_report_with_limit(
     assert_eq!(report.id, id);
     assert_eq!(report.index, index);
     assert_eq!(report.status, status);
-    assert!(report.time <= time * 1.001);
-    assert!(report.memory <= memory * 1.001);
+    assert!(report.time <= time * 1.01);
+    assert!(report.memory <= memory * 1.01);
 }
