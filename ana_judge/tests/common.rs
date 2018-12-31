@@ -43,19 +43,21 @@ impl Container {
             configs[0]["NetworkSettings"]["IPAddress"].as_str().unwrap(),
         ))
     }
+
+    pub fn kill(&self) -> io::Result<()> {
+        process::Command::new("docker")
+            .arg("Container")
+            .arg("kill")
+            .arg(&self.id)
+            .stdout(process::Stdio::null())
+            .spawn()?;
+        Ok(())
+    }
 }
 
 impl Drop for Container {
     fn drop(&mut self) {
-        process::Command::new("docker")
-            .arg("container")
-            .arg("wait")
-            .arg(&self.id)
-            .stdout(process::Stdio::null())
-            .spawn()
-            .expect("Failed to wait a Ana container exit")
-            .wait()
-            .unwrap();
+        self.kill().expect("Failed to kill a container");
         process::Command::new("docker")
             .arg("container")
             .arg("rm")
@@ -127,8 +129,8 @@ pub fn check_report_with_limit(
     memory: f64,
 ) {
     assert_eq!(report.id, id);
-    assert_eq!(report.case_index, index);
+    assert_eq!(report.index, index);
     assert_eq!(report.status, status);
-    assert!(report.time <= time * 1.01);
-    assert!(report.memory <= memory * 1.01);
+    assert!(report.time <= time * 1.001);
+    assert!(report.memory <= memory * 1.001);
 }

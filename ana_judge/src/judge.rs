@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path;
@@ -9,12 +10,71 @@ use super::{
     compare::Comparer,
     compiler::Compiler,
     launcher::{launch, LaunchResult},
-    mtp::{JudgeInfo, Problem, ProblemType, TestCase},
+    mtp::*,
 };
 
-mod structure;
+const NS_PER_SEC: f64 = 1_000_000_000 as f64;
+const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 
-pub use self::structure::{JudgeReport, JudgeResult};
+pub struct JudgeReport {
+    pub id: String,
+    pub index: usize,
+    pub status: JudgeResult,
+    pub time: u64,
+    pub memory: u64,
+}
+
+impl JudgeReport {
+    pub fn new(id: &str, index: usize, status: JudgeResult, time: u64, memory: u64) -> JudgeReport {
+        JudgeReport {
+            id: id.to_string(),
+            index,
+            status,
+            time,
+            memory,
+        }
+    }
+}
+
+pub enum JudgeResult {
+    CE,
+    AC,
+    WA,
+    TLE,
+    MLE,
+    OLE,
+    RE,
+}
+
+impl fmt::Display for JudgeResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                JudgeResult::AC => "AC",
+                JudgeResult::CE => "CE",
+                JudgeResult::MLE => "MLE",
+                JudgeResult::OLE => "OLE",
+                JudgeResult::RE => "RE",
+                JudgeResult::TLE => "TLE",
+                JudgeResult::WA => "WA",
+            }
+        )
+    }
+}
+
+impl Into<ReportInfo> for JudgeReport {
+    fn into(self) -> ReportInfo {
+        ReportInfo {
+            id: self.id,
+            index: self.index,
+            status: self.status.to_string(),
+            time: self.time as f64 / NS_PER_SEC,
+            memory: self.memory as f64 / BYTES_PER_MB,
+        }
+    }
+}
 
 fn current_judge_id() -> String {
     thread::current()
@@ -35,8 +95,8 @@ fn create_file(filename: &str) -> Box<path::Path> {
 
 fn prepare_problem(problem: &Problem) -> (u64, u64, &Vec<TestCase>, Option<Box<path::Path>>) {
     (
-        (problem.time_limit * 1000.0 * 1000.0) as u64, // Convert to us
-        (problem.memory_limit * 1024.0 * 1024.0) as u64, // Convert to bytes
+        (problem.time_limit * NS_PER_SEC) as u64,
+        (problem.memory_limit * BYTES_PER_MB) as u64,
         &problem.test_cases,
         match problem.get_type() {
             ProblemType::Normal => None,
@@ -69,7 +129,7 @@ fn judge_per_test_case(
     time_limit: u64,
     memory_limit: u64,
     spj: &Option<&path::Path>,
-) -> io::Result<JudgeReport> {
+) -> io::Result<(JudgeResult, u64, u64)> {
     let output_file = create_file("output");
     let report = launch(
         &current_judge_id(),
@@ -92,26 +152,27 @@ fn judge_per_test_case(
         LaunchResult::TLE => JudgeResult::TLE,
         LaunchResult::OLE => JudgeResult::OLE,
     };
-    Ok(JudgeReport::new(judge_result, report.time, report.memory))
+    Ok((judge_result, report.time, report.memory))
 }
 
 pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
     let executable_file = create_file("main");
-    if !Compiler::compile(
+    let compile_flag = Compiler::compile(
         &judge_info.source.language,
         &judge_info.source.code,
         &executable_file,
     )
-    .expect("Self error when compiling source")
-    {
+    .expect("Ana compiler crash when compiling source");
+
+    if !compile_flag {
         sender
-            .send(JudgeReport::new(JudgeResult::CE, 0, 0))
+            .send(JudgeReport::new(&judge_info.id, 0, JudgeResult::CE, 0, 0))
             .expect("Cannot send the result to receiver");
         return;
-    };
+    }
 
     let (time_limit, memory_limit, test_cases, spj) = prepare_problem(&judge_info.problem);
-    for test_case in test_cases {
+    for (index, test_case) in test_cases.iter().enumerate() {
         let (input_file, answer_file) = prepare_test_case(test_case);
         let judge_result = judge_per_test_case(
             &executable_file,
@@ -125,8 +186,15 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
             },
         )
         .expect("Failed when judging");
+
         sender
-            .send(judge_result)
+            .send(JudgeReport::new(
+                &judge_info.id,
+                index,
+                judge_result.0,
+                judge_result.1,
+                judge_result.2,
+            ))
             .expect("Cannot send the result to receiver");
     }
 }
