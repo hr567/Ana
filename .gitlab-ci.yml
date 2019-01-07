@@ -1,32 +1,20 @@
 image: rust:slim
 
-variables:
-  DOCKER_HOST: tcp://docker:2375/
-  DOCKER_DRIVER: overlay2
-
-services:
-  - docker:dind
+stages:
+  - build
+  - test
 
 build:
   stage: build
   script:
     - apt-get update
     - apt-get install -y
-        apt-transport-https
-        ca-certificates
-        curl
-        gnupg2
-        software-properties-common
         libzmq3-dev
         pkg-config
         gcc
         g++
-    - curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
-    - add-apt-repository
-        "deb [arch=amd64] https://download.docker.com/linux/debian
-        $(lsb_release -cs)
-        stable"
-    - apt-get update
-    - apt-get install -y docker-ce
-    - docker build -t hr567/ana .
-    - cargo test -- --test-threads=1 --nocapture
+
+test:
+  stage: test
+  script:
+    - cargo test -- --nocapture

@@ -14,6 +14,6 @@ RUN apt-get update && \
     gcc \
     g++ && \
     apt-get clean
-COPY --from=build /Ana/target/release/ana_judge /usr/local/bin
+COPY --from=build /Ana/target/release/ana /usr/local/bin
 EXPOSE 8800 8801
-CMD [ "ana_judge" ]
+CMD [ "ana" ]

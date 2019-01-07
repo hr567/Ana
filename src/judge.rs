@@ -15,6 +15,17 @@ use super::{
 const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 
+#[derive(Clone, Copy)]
+pub enum JudgeResult {
+    CE,
+    AC,
+    WA,
+    TLE,
+    MLE,
+    OLE,
+    RE,
+}
+
 pub struct JudgeReport {
     pub id: String,
     pub index: usize,
@@ -33,17 +44,6 @@ impl JudgeReport {
             memory,
         }
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum JudgeResult {
-    CE,
-    AC,
-    WA,
-    TLE,
-    MLE,
-    OLE,
-    RE,
 }
 
 impl fmt::Display for JudgeResult {
@@ -240,4 +240,22 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
             max_memory_usage,
         ))
         .expect("Cannot send the result to receiver");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_work_dir() {
+        let work_dir = WorkDir::new("test_work_dir");
+        let work_dir_path = work_dir.work_dir.clone();
+        assert!(work_dir.work_dir.exists());
+        let file_a = work_dir.create_file("a");
+        assert!(file_a.exists());
+        let file_b = work_dir.create_file("b");
+        assert!(file_b.exists());
+        drop(work_dir);
+        assert!(!work_dir_path.exists());
+    }
 }

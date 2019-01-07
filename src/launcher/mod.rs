@@ -14,7 +14,10 @@ pub enum LaunchResult {
     Pass,
     TLE,
     MLE,
+
+    #[allow(dead_code)]
     OLE,
+
     RE,
 }
 

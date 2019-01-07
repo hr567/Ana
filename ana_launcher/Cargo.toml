@@ -1,9 +1,0 @@
-[package]
-name = "ana_launcher"
-version = "0.1.0"
-authors = ["hr567 <hr567@hr567.me>"]
-edition = "2018"
-
-[dependencies]
-unshare = "0.5"
-libc = "*"
