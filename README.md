@@ -36,6 +36,9 @@ test it using:
 Please note that testing Ana needs root permission
 to read and write to cgroups.
 
+You can use `cargo test -- --test-threads=1`
+on some computers to avoid some testing mistake.
+
 `cargo run` to run Ana on the localhost.
 Needs root permission too.
 
