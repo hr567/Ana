@@ -19,7 +19,7 @@ and a few more functions.
 To build Ana at local:
 
 * Rust toolchain (Edition 2018 or higher)
-* ZeroMQ (such as libzmq-dev)
+* ZeroMQ (such as libzmq-dev on Ubuntu)
 
 
 ## Usage
@@ -31,14 +31,10 @@ To build Ana at local:
 After build the image,
 test it using:
 
-`cargo test -- --test-threads=1`
+`cargo test`
 
 Please note that testing Ana needs root permission
 to read and write to cgroups.
-
-And if test it without --test-threads=1 flag,
-the test will fail due to the launcher test doesn't
-support concurrent tasks.
 
 `cargo run` to run Ana on the localhost.
 Needs root permission too.
