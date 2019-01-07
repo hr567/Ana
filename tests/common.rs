@@ -88,7 +88,6 @@ pub fn assert_report_with_limit(
     time: f64,
     memory: f64,
 ) {
-    println!("{:?}", &report);
     assert_eq!(report.id, id);
     assert_eq!(report.index, index);
     assert_eq!(report.status, status);
