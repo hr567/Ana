@@ -251,10 +251,15 @@ mod tests {
         let work_dir = WorkDir::new("test_work_dir");
         let work_dir_path = work_dir.work_dir.clone();
         assert!(work_dir.work_dir.exists());
+
         let file_a = work_dir.create_file("a");
-        assert!(file_a.exists());
+        assert!(file_a.parent().unwrap().exists());
+        assert!(!file_a.exists());
+
         let file_b = work_dir.create_file("b");
-        assert!(file_b.exists());
+        assert!(file_b.parent().unwrap().exists());
+        assert!(!file_b.exists());
+
         drop(work_dir);
         assert!(!work_dir_path.exists());
     }
