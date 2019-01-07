@@ -1,11 +1,10 @@
 image: rust:slim
 
 stages:
-  - build
   - test
 
-build:
-  stage: build
+test:
+  stage: test
   script:
     - apt-get update
     - apt-get install -y
@@ -13,8 +12,4 @@ build:
         pkg-config
         gcc
         g++
-
-test:
-  stage: test
-  script:
     - cargo test -- --nocapture
