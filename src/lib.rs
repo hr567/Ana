@@ -1,4 +1,3 @@
-use std::env;
 use std::sync::mpsc;
 use std::thread;
 
@@ -11,10 +10,6 @@ mod launcher;
 pub mod mtp;
 
 pub use self::judge::{JudgeReport, JudgeResult};
-
-pub fn set_work_dir_environment(work_dir: &str) {
-    env::set_var("ANA_WORK_DIR", &work_dir);
-}
 
 pub fn get_zmq_sockets(recv_endpoint: &str, send_endpoint: &str) -> (zmq::Socket, zmq::Socket) {
     let context = zmq::Context::new();

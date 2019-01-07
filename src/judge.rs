@@ -82,7 +82,8 @@ struct WorkDir {
 
 impl WorkDir {
     pub fn new(id: &str) -> WorkDir {
-        let ana_work_dir = &env::var("ANA_WORK_DIR").expect("ANA_WORK_DIR is not exist");
+        let ana_work_dir = &env::var("ANA_WORK_DIR")
+            .unwrap_or_else(|_| env::temp_dir().to_str().unwrap().to_string());
         let work_dir = path::Path::new(&ana_work_dir).join(&id).into_boxed_path();
         fs::create_dir(&work_dir).expect("Failed to create work dir");
         WorkDir { work_dir }
