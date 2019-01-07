@@ -46,7 +46,14 @@ fn test_spj_1_with_mle() -> io::Result<()> {
     judge.send_judge_info(&judge_info);
     for i in 0..=judge_info.problem.len() {
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, i, "MLE", 1.0, 32.0);
+        assert_report_with_limit(
+            &report.into(),
+            &judge_info.id,
+            i,
+            "MLE",
+            1.0,
+            32.0 + MEMORY_EPS,
+        );
     }
     Ok(())
 }
@@ -78,7 +85,14 @@ fn test_spj_1_with_tle() -> io::Result<()> {
     judge.send_judge_info(&judge_info);
     for i in 0..=judge_info.problem.len() {
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, i, "TLE", 1.0, 32.0);
+        assert_report_with_limit(
+            &report.into(),
+            &judge_info.id,
+            i,
+            "TLE",
+            1.0 + TIME_EPS,
+            32.0,
+        );
     }
     Ok(())
 }

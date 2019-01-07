@@ -10,6 +10,9 @@ use zmq;
 
 use ana::*;
 
+pub const TIME_EPS: f64 = 1.0;
+pub const MEMORY_EPS: f64 = 1.0;
+
 pub struct Judge {
     judge_sender: zmq::Socket,
     report_receiver: mpsc::Receiver<JudgeReport>,
@@ -89,6 +92,6 @@ pub fn assert_report_with_limit(
     assert_eq!(report.id, id);
     assert_eq!(report.index, index);
     assert_eq!(report.status, status);
-    assert!(report.time <= time * 1.05);
-    assert!(report.memory <= memory * 1.05);
+    assert!(report.time <= time);
+    assert!(report.memory <= memory);
 }

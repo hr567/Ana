@@ -12,4 +12,4 @@ test:
         pkg-config
         gcc
         g++
-    - cargo test -- --nocapture
+    - env RUST_BACKTRACE=1 cargo test -- --nocapture
