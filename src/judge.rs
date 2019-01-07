@@ -82,10 +82,8 @@ struct WorkDir {
 
 impl WorkDir {
     pub fn new(id: &str) -> WorkDir {
-        let work_dir =
-            path::Path::new(&env::var("ANA_WORK_DIR").expect("ANA_WORK_DIR is not exist"))
-                .join(&id)
-                .into_boxed_path();
+        let ana_work_dir = &env::var("ANA_WORK_DIR").expect("ANA_WORK_DIR is not exist");
+        let work_dir = path::Path::new(&ana_work_dir).join(&id).into_boxed_path();
         fs::create_dir(&work_dir).expect("Failed to create work dir");
         WorkDir { work_dir }
     }
@@ -112,8 +110,11 @@ fn prepare_problem<'a>(
         match problem.get_type() {
             ProblemType::Normal => None,
             ProblemType::Special => {
-                let spj = work_dir.create_file("spj");
-                Compiler::compile(&problem.checker.language, &problem.checker.code, &spj)
+                let spj = work_dir.create_file("spj.exe");
+                let spj_source_file = work_dir.create_file("spj");
+                fs::write(&spj_source_file, &problem.checker.code)
+                    .expect("Failed to write spj source code");
+                Compiler::compile(&problem.checker.language, &spj_source_file, &spj)
                     .expect("Failed to build spj");
                 Some(spj)
             }
@@ -175,12 +176,11 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
     let work_dir = WorkDir::new(&judge_info.id);
 
     let executable_file = work_dir.create_file("main");
-    let compile_flag = Compiler::compile(
-        &judge_info.source.language,
-        &judge_info.source.code,
-        &executable_file,
-    )
-    .expect("Ana compiler crash when compiling source");
+    let source_file = work_dir.create_file("source");
+    fs::write(&source_file, &judge_info.source.code).expect("Failed to write source code");
+    let compile_flag =
+        Compiler::compile(&judge_info.source.language, &source_file, &executable_file)
+            .expect("Ana compiler crash when compiling source");
 
     if !compile_flag {
         sender

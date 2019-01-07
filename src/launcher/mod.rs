@@ -39,7 +39,7 @@ pub fn launch(
         cgroup::AnaCgroup::init()?;
     }
 
-    let limit = cgroup::AnaCgroup::new(judge_id.to_string())?;
+    let limit = cgroup::AnaCgroup::new(judge_id.to_string());
     unsafe {
         limit.set_time_limit(time_limit)?;
         limit.set_memory_limit(memory_limit)?;

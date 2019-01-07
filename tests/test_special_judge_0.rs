@@ -78,7 +78,7 @@ fn test_spj_0_with_tle() -> io::Result<()> {
     judge.send_judge_info(&judge_info);
     for i in 0..=judge_info.problem.len() {
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, i, "tle", 1.0, 32.0);
+        assert_report_with_limit(&report.into(), &judge_info.id, i, "TLE", 1.0, 32.0);
     }
     Ok(())
 }
@@ -94,7 +94,7 @@ fn test_spj_0_with_wa() -> io::Result<()> {
     judge.send_judge_info(&judge_info);
     for i in 0..=judge_info.problem.len() {
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, i, "wa", 1.0, 32.0);
+        assert_report_with_limit(&report.into(), &judge_info.id, i, "WA", 1.0, 32.0);
     }
     Ok(())
 }

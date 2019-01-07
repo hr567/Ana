@@ -7,12 +7,6 @@ pub struct JudgeInfo {
     pub problem: Problem,
 }
 
-impl JudgeInfo {
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
-
 pub enum ProblemType {
     Normal,
     Special,

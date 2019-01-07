@@ -17,10 +17,10 @@ pub struct Judge {
 
 impl Judge {
     pub fn new(name: &str) -> Judge {
-        let (judge_sender, judge_receiver) = create_judge_sockets(&name);
+        let (judge_sender, judge_receiver) = create_judge_sockets(&format!("inproc://{}", &name));
         let (report_sender, report_receiver) = mpsc::channel::<JudgeReport>();
         thread::spawn(move || {
-            ana::start_judging(judge_receiver, report_sender);
+            ana::start_judging(&judge_receiver, &report_sender);
         });
         Judge {
             judge_sender,
@@ -41,29 +41,17 @@ impl Judge {
 
 impl Drop for Judge {
     fn drop(&mut self) {
-        self.judge_sender.send(&[0], 0).unwrap();
+        self.judge_sender.send_str("EOF", 0).unwrap();
     }
 }
 
 fn create_judge_sockets(endpoint: &str) -> (zmq::Socket, zmq::Socket) {
-    (
-        create_judge_sender(&endpoint),
-        create_judge_receiver(&endpoint),
-    )
-}
-
-fn create_judge_sender(endpoint: &str) -> zmq::Socket {
     let context = zmq::Context::new();
-    let socket = context.socket(zmq::PUSH).unwrap();
-    socket.connect(&endpoint).unwrap();
-    socket
-}
-
-fn create_judge_receiver(endpoint: &str) -> zmq::Socket {
-    let context = zmq::Context::new();
-    let socket = context.socket(zmq::PULL).unwrap();
-    socket.bind(&endpoint).unwrap();
-    socket
+    let sender = context.socket(zmq::PUSH).unwrap();
+    sender.connect(&endpoint).unwrap();
+    let receiver = context.socket(zmq::PULL).unwrap();
+    receiver.bind(&endpoint).unwrap();
+    (sender, receiver)
 }
 
 pub fn generate_judge_info<T: AsRef<path::Path>>(
@@ -97,9 +85,10 @@ pub fn assert_report_with_limit(
     time: f64,
     memory: f64,
 ) {
+    println!("{:?}", &report);
     assert_eq!(report.id, id);
     assert_eq!(report.index, index);
     assert_eq!(report.status, status);
-    assert!(report.time <= time * 1.01);
-    assert!(report.memory <= memory * 1.01);
+    assert!(report.time <= time * 1.05);
+    assert!(report.memory <= memory * 1.05);
 }
