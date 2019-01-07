@@ -91,6 +91,16 @@ pub fn assert_report_with_limit(
     assert_eq!(report.id, id);
     assert_eq!(report.index, index);
     assert_eq!(report.status, status);
-    assert!(report.time <= time);
-    assert!(report.memory <= memory);
+    assert!(
+        report.time <= time,
+        "REAL TIME: {}\tLIMIT TIME: {}",
+        report.time,
+        time
+    );
+    assert!(
+        report.memory <= memory,
+        "REAL MEMORY: {}\tLIMIT MEMORY: {}",
+        report.memory,
+        memory
+    );
 }
