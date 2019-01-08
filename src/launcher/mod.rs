@@ -51,7 +51,7 @@ pub fn launch(
         let limit: *const cgroup::AnaCgroup = &limit;
         child.before_unfreeze(move |child_pid| {
             thread::spawn(move || {
-                thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 100));
+                thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 10));
                 unsafe {
                     libc::kill(child_pid as i32, libc::SIGKILL);
                 }
