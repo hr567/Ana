@@ -26,7 +26,7 @@ impl Judge {
         let (report_sender, report_receiver) =
             create_zmq_socket_pair(&format!("inproc://{}-report", &name));
         thread::spawn(move || {
-            start_judging(judge_receiver, Arc::new(Mutex::new(report_sender)));
+            start_judging(&judge_receiver, &Arc::new(Mutex::new(report_sender)));
         });
         Judge {
             judge_sender,

@@ -6,27 +6,25 @@ mod back_ends;
 
 use self::back_ends::{CGcc, CppGxx};
 
-pub struct Compiler;
+pub fn compile(
+    language: &str,
+    source_file: &path::Path,
+    executable_file: &path::Path,
+) -> io::Result<bool> {
+    let compiler = get_compiler(&language).unwrap();
+    compiler.compile(&source_file, &executable_file)
+}
 
-impl Compiler {
-    pub fn compile(
-        language: &str,
-        source_file: &path::Path,
-        executable_file: &path::Path,
-    ) -> io::Result<bool> {
-        match language {
-            "c.gcc" => {
-                let source_file =
-                    rename_with_new_extension(source_file, &<Compiler as CGcc>::suffix())?;
-                <Compiler as CGcc>::compile(&source_file, &executable_file)
-            }
-            "cpp.gxx" => {
-                let source_file =
-                    rename_with_new_extension(source_file, &<Compiler as CppGxx>::suffix())?;
-                <Compiler as CppGxx>::compile(&source_file, executable_file)
-            }
-            _ => unimplemented!("Language or compiler {} is not support", language),
-        }
+trait Compiler {
+    fn suffix(&self) -> &'static str;
+    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> io::Result<bool>;
+}
+
+fn get_compiler(language: &str) -> Result<Box<dyn Compiler>, &'static str> {
+    match language {
+        "c.gcc" => Ok(Box::new(CGcc::new())),
+        "cpp.gxx" => Ok(Box::new(CppGxx::new())),
+        _ => Err("Language or compiler is not support"),
     }
 }
 
@@ -53,7 +51,8 @@ mod tests {
         let source_file = env::temp_dir().join("c_compile_test.c");
         fs::write(&source_file, "#include<stdio.h>\nint main() { return 0; }")
             .expect("Failed to write source code");
-        assert!(Compiler::compile("c.gcc", &source_file, &executable_file)?);
+        let compiler = get_compiler("c.gcc").unwrap();
+        assert!(compiler.compile(&source_file, &executable_file)?);
         assert!(Command::new(&executable_file).status()?.success());
         Ok(())
     }
@@ -64,11 +63,8 @@ mod tests {
         let source_file = env::temp_dir().join("cpp_compile_test.cpp");
         fs::write(&source_file, "#include<iostream>\nint main() { return 0; }")
             .expect("Failed to write source code");
-        assert!(Compiler::compile(
-            "cpp.gxx",
-            &source_file,
-            &executable_file
-        )?);
+        let compiler = get_compiler("cpp.gxx").unwrap();
+        assert!(compiler.compile(&source_file, &executable_file)?);
         assert!(Command::new(&executable_file).status()?.success());
         Ok(())
     }

@@ -2,17 +2,24 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
-use super::Compiler;
+use super::*;
 
-pub trait CppGxx {
-    fn suffix() -> &'static str {
-        "cpp"
+pub struct CppGxx;
+
+impl CppGxx {
+    pub fn new() -> CppGxx {
+        CppGxx {}
     }
-    fn compile(source_file: &Path, executable_file: &Path) -> io::Result<bool>;
 }
 
-impl CppGxx for Compiler {
-    fn compile(source_file: &Path, executable_file: &Path) -> io::Result<bool> {
+impl Compiler for CppGxx {
+    fn suffix(&self) -> &'static str {
+        "cpp"
+    }
+
+    fn compile(&self, source_file: &Path, executable_file: &Path) -> io::Result<bool> {
+        let source_file = rename_with_new_extension(&source_file, self.suffix())
+            .expect("Failed to rename source file");
         Ok(Command::new("g++")
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
@@ -36,11 +43,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_suffix() {
-        assert_eq!(<Compiler as CppGxx>::suffix(), "cpp");
-    }
-
-    #[test]
     fn test_compile() -> io::Result<()> {
         let source_file_path = env::temp_dir().join("cpp_compiler_test_pass.cpp");
         fs::write(
@@ -48,10 +50,7 @@ mod tests {
             "#include<iostream>\nint main() { return 0; }",
         )?;
         let executable_file_path = env::temp_dir().join("cpp_compiler_test_pass.exe");
-        assert!(<Compiler as CppGxx>::compile(
-            &source_file_path,
-            &executable_file_path,
-        )?);
+        assert!(CppGxx::new().compile(&source_file_path, &executable_file_path,)?);
         Ok(())
     }
 
@@ -63,10 +62,7 @@ mod tests {
             "#include<iostream>\nint main() { return 0 }",
         )?;
         let executable_file_path = env::temp_dir().join("cpp_compiler_test_fail.exe");
-        assert!(!<Compiler as CppGxx>::compile(
-            &source_file_path,
-            &executable_file_path
-        )?);
+        assert!(!CppGxx::new().compile(&source_file_path, &executable_file_path)?);
         Ok(())
     }
 }

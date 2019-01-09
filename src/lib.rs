@@ -16,14 +16,14 @@ pub fn start_judging<
     T: communicator::JudgeReceiver,
     U: 'static + Clone + Send + communicator::ReportSender,
 >(
-    judge_receiver: T,
-    report_sender: U,
+    judge_receiver: &T,
+    report_sender: &U,
 ) {
     let mut tasks: VecDeque<_> = VecDeque::new();
     while let Some(judge_info) = judge_receiver.receive_judge_information() {
         let report_sender = report_sender.clone();
         let new_task = thread::spawn(move || {
-            judge::judge(judge_info, report_sender);
+            judge::judge(&judge_info, &report_sender);
         });
         tasks.push_back(new_task);
     }

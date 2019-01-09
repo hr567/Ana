@@ -6,7 +6,7 @@ use std::path;
 use super::{
     communicator::ReportSender,
     compare::Comparer,
-    compiler::Compiler,
+    compiler::compile,
     launcher::{launch, LaunchResult},
     mtp::*,
 };
@@ -53,7 +53,7 @@ fn prepare_problem<'a>(
                 let spj_source_file = work_dir.create_file("spj");
                 fs::write(&spj_source_file, &problem.checker.code)
                     .expect("Failed to write spj source code");
-                Compiler::compile(&problem.checker.language, &spj_source_file, &spj)
+                compile(&problem.checker.language, &spj_source_file, &spj)
                     .expect("Failed to build spj");
                 Some(spj)
             }
@@ -111,15 +111,14 @@ fn judge_per_test_case(
     Ok((judge_result, report.time, report.memory))
 }
 
-pub fn judge(judge_info: JudgeInfo, sender: impl ReportSender) {
+pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
     let work_dir = WorkDir::new(&judge_info.id);
 
     let executable_file = work_dir.create_file("main");
     let source_file = work_dir.create_file("source");
     fs::write(&source_file, &judge_info.source.code).expect("Failed to write source code");
-    let compile_flag =
-        Compiler::compile(&judge_info.source.language, &source_file, &executable_file)
-            .expect("Ana compiler crash when compiling source");
+    let compile_flag = compile(&judge_info.source.language, &source_file, &executable_file)
+        .expect("Ana compiler crash when compiling source");
 
     if !compile_flag {
         sender.send_report_information(ReportInfo::new(

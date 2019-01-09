@@ -19,7 +19,7 @@ fn main() {
     let (judge_receiver, report_sender) =
         get_zmq_sockets("tcp://0.0.0.0:8800", "tcp://0.0.0.0:8801");
     start_judging(
-        judge_receiver,
-        sync::Arc::new(sync::Mutex::new(report_sender)),
+        &judge_receiver,
+        &sync::Arc::new(sync::Mutex::new(report_sender)),
     );
 }

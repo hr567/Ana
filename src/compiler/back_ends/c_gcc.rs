@@ -2,17 +2,24 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
-use super::Compiler;
+use super::*;
 
-pub trait CGcc {
-    fn suffix() -> &'static str {
-        "c"
+pub struct CGcc;
+
+impl CGcc {
+    pub fn new() -> CGcc {
+        CGcc {}
     }
-    fn compile(source_file: &Path, executable_file: &Path) -> io::Result<bool>;
 }
 
-impl CGcc for Compiler {
-    fn compile(source_file: &Path, executable_file: &Path) -> io::Result<bool> {
+impl Compiler for CGcc {
+    fn suffix(&self) -> &'static str {
+        "c"
+    }
+
+    fn compile(&self, source_file: &Path, executable_file: &Path) -> io::Result<bool> {
+        let source_file = rename_with_new_extension(&source_file, self.suffix())
+            .expect("Failed to rename source file");
         Ok(Command::new("gcc")
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
@@ -36,11 +43,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_suffix() {
-        assert_eq!(<Compiler as CGcc>::suffix(), "c");
-    }
-
-    #[test]
     fn test_compile() -> io::Result<()> {
         let source_file_path = env::temp_dir().join("c_compiler_test_pass.c");
         fs::write(
@@ -48,10 +50,7 @@ mod tests {
             "#include<stdio.h>\nint main() { return 0; }",
         )?;
         let executable_file_path = env::temp_dir().join("c_compiler_test_pass.exe");
-        assert!(<Compiler as CGcc>::compile(
-            &source_file_path,
-            &executable_file_path
-        )?);
+        assert!(CGcc::new().compile(&source_file_path, &executable_file_path)?);
         Ok(())
     }
 
@@ -63,10 +62,7 @@ mod tests {
             "#include<stdio.h>\nint main() { return 0 }",
         )?;
         let executable_file_path = env::temp_dir().join("c_compiler_test_fail.exe");
-        assert!(!<Compiler as CGcc>::compile(
-            &source_file_path,
-            &executable_file_path
-        )?);
+        assert!(!CGcc::new().compile(&source_file_path, &executable_file_path)?);
         Ok(())
     }
 }
