@@ -1,7 +1,7 @@
 use std::fs;
 use std::io;
 use std::path;
-use std::sync::mpsc;
+use std::sync::*;
 use std::thread;
 
 use serde_json;
@@ -16,15 +16,17 @@ pub const MEMORY_EPS: f64 = 1.0;
 
 pub struct Judge {
     judge_sender: zmq::Socket,
-    report_receiver: mpsc::Receiver<ReportInfo>,
+    report_receiver: zmq::Socket,
 }
 
 impl Judge {
     pub fn new(name: &str) -> Judge {
-        let (judge_sender, judge_receiver) = create_judge_sockets(&format!("inproc://{}", &name));
-        let (report_sender, report_receiver) = mpsc::channel::<_>();
+        let (judge_sender, judge_receiver) =
+            create_zmq_socket_pair(&format!("inproc://{}-judge", &name));
+        let (report_sender, report_receiver) =
+            create_zmq_socket_pair(&format!("inproc://{}-report", &name));
         thread::spawn(move || {
-            ana::start_judging(&judge_receiver, &report_sender);
+            start_judging(judge_receiver, Arc::new(Mutex::new(report_sender)));
         });
         Judge {
             judge_sender,
@@ -39,7 +41,8 @@ impl Judge {
     }
 
     pub fn receive_report(&self) -> ReportInfo {
-        self.report_receiver.recv().unwrap()
+        let report_json = self.report_receiver.recv_string(0).unwrap().unwrap();
+        serde_json::from_str(&report_json).unwrap()
     }
 }
 
@@ -49,7 +52,7 @@ impl Drop for Judge {
     }
 }
 
-fn create_judge_sockets(endpoint: &str) -> (zmq::Socket, zmq::Socket) {
+fn create_zmq_socket_pair(endpoint: &str) -> (zmq::Socket, zmq::Socket) {
     let context = zmq::Context::new();
     let sender = context.socket(zmq::PUSH).unwrap();
     sender.connect(&endpoint).unwrap();

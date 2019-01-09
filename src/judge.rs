@@ -2,9 +2,9 @@ use std::env;
 use std::fs;
 use std::io;
 use std::path;
-use std::sync;
 
 use super::{
+    communicator::ReportSender,
     compare::Comparer,
     compiler::Compiler,
     launcher::{launch, LaunchResult},
@@ -111,7 +111,7 @@ fn judge_per_test_case(
     Ok((judge_result, report.time, report.memory))
 }
 
-pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<ReportInfo>) {
+pub fn judge(judge_info: JudgeInfo, sender: impl ReportSender) {
     let work_dir = WorkDir::new(&judge_info.id);
 
     let executable_file = work_dir.create_file("main");
@@ -122,15 +122,13 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<ReportInfo>) {
             .expect("Ana compiler crash when compiling source");
 
     if !compile_flag {
-        sender
-            .send(ReportInfo::new(
-                &judge_info.id,
-                0,
-                JudgeResult::CE,
-                0.0,
-                0.0,
-            ))
-            .expect("Cannot send the result to receiver");
+        sender.send_report_information(ReportInfo::new(
+            &judge_info.id,
+            0,
+            JudgeResult::CE,
+            0.0,
+            0.0,
+        ));
         return;
     }
 
@@ -165,26 +163,22 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<ReportInfo>) {
             max_memory_usage = judge_result.2;
         }
 
-        sender
-            .send(ReportInfo::new(
-                &judge_info.id,
-                index,
-                judge_result.0,
-                judge_result.1 as f64 / NS_PER_SEC,
-                judge_result.2 as f64 / BYTES_PER_MB,
-            ))
-            .expect("Cannot send the result to receiver");
+        sender.send_report_information(ReportInfo::new(
+            &judge_info.id,
+            index,
+            judge_result.0,
+            judge_result.1 as f64 / NS_PER_SEC,
+            judge_result.2 as f64 / BYTES_PER_MB,
+        ));
     }
 
-    sender
-        .send(ReportInfo::new(
-            &judge_info.id,
-            judge_info.problem.len(),
-            summary_status,
-            max_time_usage as f64 / NS_PER_SEC,
-            max_memory_usage as f64 / BYTES_PER_MB,
-        ))
-        .expect("Cannot send the result to receiver");
+    sender.send_report_information(ReportInfo::new(
+        &judge_info.id,
+        judge_info.problem.len(),
+        summary_status,
+        max_time_usage as f64 / NS_PER_SEC,
+        max_memory_usage as f64 / BYTES_PER_MB,
+    ));
 }
 
 #[cfg(test)]

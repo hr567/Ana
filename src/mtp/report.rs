@@ -6,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 pub struct ReportInfo {
     pub id: String,
     pub index: usize,
-    pub status: &'static str,
+    pub status: String,
     pub time: f64,
     pub memory: f64,
 }
@@ -16,7 +16,7 @@ impl ReportInfo {
         ReportInfo {
             id: String::from(id),
             index,
-            status: &status.as_str(),
+            status: status.as_str().to_string(),
             time,
             memory,
         }
@@ -39,7 +39,7 @@ pub enum JudgeResult {
 }
 
 impl JudgeResult {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             JudgeResult::AC => "AC",
             JudgeResult::CE => "CE",
