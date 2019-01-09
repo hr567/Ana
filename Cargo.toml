@@ -1,7 +1,7 @@
 [package]
 name = "ana"
 description = "A judge in Rust"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["hr567 <hr567@hr567.me>"]
 edition = "2018"
 
