@@ -9,8 +9,6 @@ mod judge;
 mod launcher;
 pub mod mtp;
 
-pub use self::judge::{JudgeReport, JudgeResult};
-
 pub fn get_zmq_sockets(recv_endpoint: &str, send_endpoint: &str) -> (zmq::Socket, zmq::Socket) {
     let context = zmq::Context::new();
     let receiver = context.socket(zmq::PULL).unwrap();
@@ -25,7 +23,7 @@ pub fn get_zmq_sockets(recv_endpoint: &str, send_endpoint: &str) -> (zmq::Socket
 }
 
 pub fn start_reporting(
-    judge_report_receiver: &mpsc::Receiver<judge::JudgeReport>,
+    judge_report_receiver: &mpsc::Receiver<mtp::ReportInfo>,
     report_sender: &zmq::Socket,
 ) {
     while let Ok(report) = judge_report_receiver.recv() {
@@ -38,7 +36,7 @@ pub fn start_reporting(
 
 pub fn start_judging(
     judge_receiver: &zmq::Socket,
-    judge_report_sender: &mpsc::Sender<judge::JudgeReport>,
+    judge_report_sender: &mpsc::Sender<mtp::ReportInfo>,
 ) {
     loop {
         let judge_info = judge_receiver

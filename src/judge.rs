@@ -1,5 +1,4 @@
 use std::env;
-use std::fmt;
 use std::fs;
 use std::io;
 use std::path;
@@ -14,67 +13,6 @@ use super::{
 
 const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
-
-#[derive(Clone, Copy)]
-pub enum JudgeResult {
-    CE,
-    AC,
-    WA,
-    TLE,
-    MLE,
-    OLE,
-    RE,
-}
-
-pub struct JudgeReport {
-    pub id: String,
-    pub index: usize,
-    pub status: JudgeResult,
-    pub time: u64,
-    pub memory: u64,
-}
-
-impl JudgeReport {
-    pub fn new(id: &str, index: usize, status: JudgeResult, time: u64, memory: u64) -> JudgeReport {
-        JudgeReport {
-            id: id.to_string(),
-            index,
-            status,
-            time,
-            memory,
-        }
-    }
-}
-
-impl fmt::Display for JudgeResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                JudgeResult::AC => "AC",
-                JudgeResult::CE => "CE",
-                JudgeResult::MLE => "MLE",
-                JudgeResult::OLE => "OLE",
-                JudgeResult::RE => "RE",
-                JudgeResult::TLE => "TLE",
-                JudgeResult::WA => "WA",
-            }
-        )
-    }
-}
-
-impl Into<ReportInfo> for JudgeReport {
-    fn into(self) -> ReportInfo {
-        ReportInfo {
-            id: self.id,
-            index: self.index,
-            status: self.status.to_string(),
-            time: self.time as f64 / NS_PER_SEC,
-            memory: self.memory as f64 / BYTES_PER_MB,
-        }
-    }
-}
 
 struct WorkDir {
     work_dir: Box<path::Path>,
@@ -173,7 +111,7 @@ fn judge_per_test_case(
     Ok((judge_result, report.time, report.memory))
 }
 
-pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
+pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<ReportInfo>) {
     let work_dir = WorkDir::new(&judge_info.id);
 
     let executable_file = work_dir.create_file("main");
@@ -185,7 +123,13 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
 
     if !compile_flag {
         sender
-            .send(JudgeReport::new(&judge_info.id, 0, JudgeResult::CE, 0, 0))
+            .send(ReportInfo::new(
+                &judge_info.id,
+                0,
+                JudgeResult::CE,
+                0.0,
+                0.0,
+            ))
             .expect("Cannot send the result to receiver");
         return;
     }
@@ -222,23 +166,23 @@ pub fn judge(judge_info: &JudgeInfo, sender: &sync::mpsc::Sender<JudgeReport>) {
         }
 
         sender
-            .send(JudgeReport::new(
+            .send(ReportInfo::new(
                 &judge_info.id,
                 index,
                 judge_result.0,
-                judge_result.1,
-                judge_result.2,
+                judge_result.1 as f64 / NS_PER_SEC,
+                judge_result.2 as f64 / BYTES_PER_MB,
             ))
             .expect("Cannot send the result to receiver");
     }
 
     sender
-        .send(JudgeReport::new(
+        .send(ReportInfo::new(
             &judge_info.id,
             judge_info.problem.len(),
             summary_status,
-            max_time_usage,
-            max_memory_usage,
+            max_time_usage as f64 / NS_PER_SEC,
+            max_memory_usage as f64 / BYTES_PER_MB,
         ))
         .expect("Cannot send the result to receiver");
 }

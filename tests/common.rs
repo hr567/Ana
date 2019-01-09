@@ -8,6 +8,7 @@ use serde_json;
 use uuid::prelude::*;
 use zmq;
 
+use ana::mtp::*;
 use ana::*;
 
 pub const TIME_EPS: f64 = 1.0;
@@ -15,13 +16,13 @@ pub const MEMORY_EPS: f64 = 1.0;
 
 pub struct Judge {
     judge_sender: zmq::Socket,
-    report_receiver: mpsc::Receiver<JudgeReport>,
+    report_receiver: mpsc::Receiver<ReportInfo>,
 }
 
 impl Judge {
     pub fn new(name: &str) -> Judge {
         let (judge_sender, judge_receiver) = create_judge_sockets(&format!("inproc://{}", &name));
-        let (report_sender, report_receiver) = mpsc::channel::<JudgeReport>();
+        let (report_sender, report_receiver) = mpsc::channel::<_>();
         thread::spawn(move || {
             ana::start_judging(&judge_receiver, &report_sender);
         });
@@ -37,7 +38,7 @@ impl Judge {
             .unwrap();
     }
 
-    pub fn receive_report(&self) -> JudgeReport {
+    pub fn receive_report(&self) -> ReportInfo {
         self.report_receiver.recv().unwrap()
     }
 }

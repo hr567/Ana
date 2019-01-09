@@ -3,5 +3,5 @@ mod report;
 
 pub use self::{
     judge::{JudgeInfo, Problem, ProblemType, Source, TestCase},
-    report::ReportInfo,
+    report::{JudgeResult, ReportInfo},
 };
