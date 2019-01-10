@@ -31,6 +31,8 @@ on some computers to avoid some testing mistake.
 `cargo run` to run Ana on the localhost.
 Needs root permission too.
 
+Run `cargo run -- --help` for more information.
+
 
 ## MTP
 
