@@ -1,8 +1,8 @@
-use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::thread;
 
+use futures;
 use serde_json;
+use tokio_threadpool;
 use zmq;
 
 mod communicator;
@@ -16,21 +16,19 @@ pub fn start_judging<
     T: communicator::JudgeReceiver,
     U: 'static + Clone + Send + communicator::ReportSender,
 >(
+    max_threads: usize,
     judge_receiver: &T,
     report_sender: &U,
 ) {
-    let mut tasks: VecDeque<_> = VecDeque::new();
+    let pool = tokio_threadpool::Builder::new()
+        .pool_size(max_threads)
+        .build();
     while let Some(judge_info) = judge_receiver.receive_judge_information() {
         let report_sender = report_sender.clone();
-        let new_task = thread::spawn(move || {
+        pool.spawn(futures::lazy(move || {
             judge::judge(&judge_info, &report_sender);
-        });
-        tasks.push_back(new_task);
-    }
-    for task in tasks {
-        match task.join() {
-            _ => {}
-        }
+            Ok(())
+        }));
     }
 }
 
