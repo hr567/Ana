@@ -27,15 +27,16 @@ impl ReportInfo {
     }
 }
 
+#[repr(i8)]
 #[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum JudgeResult {
-    CE,
-    AC,
-    WA,
-    TLE,
-    MLE,
-    OLE,
-    RE,
+    CE = -1,
+    AC = 0,
+    WA = 1,
+    TLE = 2,
+    MLE = 3,
+    OLE = 4,
+    RE = 5,
 }
 
 impl JudgeResult {

@@ -17,10 +17,10 @@ impl Compiler for CppGxx {
         "cpp"
     }
 
-    fn compile(&self, source_file: &Path, executable_file: &Path) -> io::Result<bool> {
+    fn compile(&self, source_file: &Path, executable_file: &Path) -> io::Result<Result> {
         let source_file = rename_with_new_extension(&source_file, self.suffix())
             .expect("Failed to rename source file");
-        Ok(Command::new("g++")
+        let res = Command::new("g++")
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
             .arg("-O2")
@@ -29,8 +29,12 @@ impl Compiler for CppGxx {
             .arg("-lm")
             .arg("--static")
             .arg("--std=c++11")
-            .status()?
-            .success())
+            .output()?;
+        Ok(if res.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8(res.stderr).unwrap_or_default())
+        })
     }
 }
 
@@ -50,7 +54,9 @@ mod tests {
             "#include<iostream>\nint main() { return 0; }",
         )?;
         let executable_file_path = env::temp_dir().join("cpp_compiler_test_pass.exe");
-        assert!(CppGxx::new().compile(&source_file_path, &executable_file_path,)?);
+        assert!(CppGxx::new()
+            .compile(&source_file_path, &executable_file_path)?
+            .is_ok());
         Ok(())
     }
 
@@ -62,7 +68,9 @@ mod tests {
             "#include<iostream>\nint main() { return 0 }",
         )?;
         let executable_file_path = env::temp_dir().join("cpp_compiler_test_fail.exe");
-        assert!(!CppGxx::new().compile(&source_file_path, &executable_file_path)?);
+        assert!(CppGxx::new()
+            .compile(&source_file_path, &executable_file_path)?
+            .is_err());
         Ok(())
     }
 }

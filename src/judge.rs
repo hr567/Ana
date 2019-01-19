@@ -5,7 +5,7 @@ use std::path;
 
 use super::{
     communicator::ReportSender,
-    compare::Comparer,
+    compare::check,
     compiler::compile,
     launcher::{launch, LaunchResult},
     mtp::*,
@@ -53,9 +53,11 @@ fn prepare_problem<'a>(
                 let spj_source_file = work_dir.create_file("spj");
                 fs::write(&spj_source_file, &problem.checker.code)
                     .expect("Failed to write spj source code");
-                compile(&problem.checker.language, &spj_source_file, &spj)
-                    .expect("Failed to build spj");
-                Some(spj)
+                if compile(&problem.checker.language, &spj_source_file, &spj).is_ok() {
+                    Some(spj)
+                } else {
+                    unimplemented!("Failed to compile special judge")
+                }
             }
         },
     )
@@ -97,7 +99,7 @@ fn judge_per_test_case(
     )?;
     let judge_result = match &report.status {
         LaunchResult::Pass => {
-            if Comparer::check(&input_file, &output_file, &answer_file, &spj)? {
+            if check(&input_file, &output_file, &answer_file, &spj)? {
                 JudgeResult::AC
             } else {
                 JudgeResult::WA
@@ -112,68 +114,67 @@ fn judge_per_test_case(
 }
 
 pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
-    let work_dir = WorkDir::new(&judge_info.id);
+    let JudgeInfo {
+        id: judge_id,
+        source,
+        problem,
+    } = &judge_info;
+
+    let work_dir = WorkDir::new(&judge_id);
 
     let executable_file = work_dir.create_file("main");
     let source_file = work_dir.create_file("source");
-    fs::write(&source_file, &judge_info.source.code).expect("Failed to write source code");
-    let compile_flag = compile(&judge_info.source.language, &source_file, &executable_file)
+    fs::write(&source_file, &source.code).expect("Failed to write source code");
+    let compile_flag = compile(&source.language, &source_file, &executable_file)
         .expect("Ana compiler crash when compiling source");
 
-    if !compile_flag {
-        sender.send_report_information(ReportInfo::new(
-            &judge_info.id,
-            0,
-            JudgeResult::CE,
-            0.0,
-            0.0,
-        ));
+    if compile_flag.is_err() {
+        sender.send_report_information(ReportInfo::new(&judge_id, 0, JudgeResult::CE, 0.0, 0.0));
         return;
     }
 
     let (mut summary_status, mut max_time_usage, mut max_memory_usage) = (JudgeResult::AC, 0, 0);
 
-    let (time_limit, memory_limit, test_cases, spj) =
-        prepare_problem(&work_dir, &judge_info.problem);
+    let (time_limit, memory_limit, test_cases, spj) = prepare_problem(&work_dir, &problem);
     for (index, test_case) in test_cases.iter().enumerate() {
         let (input_file, answer_file) = prepare_test_case(&work_dir, &test_case);
-        let judge_result = judge_per_test_case(
+        let (status, time_usage, memory_usage) = judge_per_test_case(
             &work_dir,
-            &judge_info.id,
+            &judge_id,
             &executable_file,
             &input_file,
             &answer_file,
             time_limit,
             memory_limit,
             &match spj {
-                Some(ref spj) => Some(spj.as_ref()),
+                Some(ref p) => Some(p.as_ref()),
                 None => None,
             },
         )
         .expect("Failed when judging");
 
         if let JudgeResult::AC = summary_status {
-            summary_status = judge_result.0;
+            summary_status = status;
         }
-        if judge_result.1 > max_time_usage {
-            max_time_usage = judge_result.1;
+        if time_usage > max_time_usage {
+            max_time_usage = time_usage;
         }
-        if judge_result.2 > max_memory_usage {
-            max_memory_usage = judge_result.2;
+        if memory_usage > max_memory_usage {
+            max_memory_usage = memory_usage;
         }
 
         sender.send_report_information(ReportInfo::new(
-            &judge_info.id,
+            &judge_id,
             index,
-            judge_result.0,
-            judge_result.1 as f64 / NS_PER_SEC,
-            judge_result.2 as f64 / BYTES_PER_MB,
+            status,
+            time_usage as f64 / NS_PER_SEC,
+            memory_usage as f64 / BYTES_PER_MB,
         ));
     }
 
     sender.send_report_information(ReportInfo::new(
-        &judge_info.id,
-        judge_info.problem.len(),
+        &judge_id,
+        problem.len(),
         summary_status,
         max_time_usage as f64 / NS_PER_SEC,
         max_memory_usage as f64 / BYTES_PER_MB,

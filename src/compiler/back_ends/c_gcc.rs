@@ -1,6 +1,6 @@
 use std::io;
 use std::path::Path;
-use std::process::Command;
+use std::process;
 
 use super::*;
 
@@ -17,10 +17,13 @@ impl Compiler for CGcc {
         "c"
     }
 
-    fn compile(&self, source_file: &Path, executable_file: &Path) -> io::Result<bool> {
+    fn compile(&self, source_file: &Path, executable_file: &Path) -> io::Result<Result> {
         let source_file = rename_with_new_extension(&source_file, self.suffix())
             .expect("Failed to rename source file");
-        Ok(Command::new("gcc")
+        let res = process::Command::new("gcc")
+            .stdin(process::Stdio::null())
+            .stdout(process::Stdio::null())
+            .stderr(process::Stdio::piped())
             .arg(source_file.to_str().unwrap())
             .args(&["-o", executable_file.to_str().unwrap()])
             .arg("-O2")
@@ -29,8 +32,12 @@ impl Compiler for CGcc {
             .arg("-lm")
             .arg("--static")
             .arg("--std=c99")
-            .status()?
-            .success())
+            .output()?;
+        Ok(if res.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8(res.stderr).unwrap_or_default())
+        })
     }
 }
 
@@ -50,7 +57,9 @@ mod tests {
             "#include<stdio.h>\nint main() { return 0; }",
         )?;
         let executable_file_path = env::temp_dir().join("c_compiler_test_pass.exe");
-        assert!(CGcc::new().compile(&source_file_path, &executable_file_path)?);
+        assert!(CGcc::new()
+            .compile(&source_file_path, &executable_file_path)?
+            .is_ok());
         Ok(())
     }
 
@@ -62,7 +71,9 @@ mod tests {
             "#include<stdio.h>\nint main() { return 0 }",
         )?;
         let executable_file_path = env::temp_dir().join("c_compiler_test_fail.exe");
-        assert!(!CGcc::new().compile(&source_file_path, &executable_file_path)?);
+        assert!(CGcc::new()
+            .compile(&source_file_path, &executable_file_path)?
+            .is_err());
         Ok(())
     }
 }

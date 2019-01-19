@@ -2,9 +2,9 @@ use std::sync;
 
 use clap;
 
-use ana::*;
+use ana::start_judging;
 
-fn main() {
+fn get_arguments() -> (usize, String, String) {
     let matches = clap::App::new("Ana Judge")
         .version("0.4.2")
         .author("hr567")
@@ -48,6 +48,16 @@ fn main() {
         .expect("Failed to set max threads");
     let judge_receiver_endpoint = matches.value_of("judge_receive_endpoint").unwrap();
     let report_sender_endpoint = matches.value_of("report_send_endpoint").unwrap();
+
+    (
+        max_threads,
+        judge_receiver_endpoint.to_string(),
+        report_sender_endpoint.to_string(),
+    )
+}
+
+fn main() {
+    let (max_threads, judge_receiver_endpoint, report_sender_endpoint) = get_arguments();
 
     let context = zmq::Context::new();
     let judge_receiver = context.socket(zmq::PULL).unwrap();

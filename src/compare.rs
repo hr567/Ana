@@ -1,12 +1,18 @@
 use std::fs;
 use std::io;
-use std::io::prelude::*;
 use std::path;
 use std::process;
+use std::str;
 
-pub struct Comparer;
-
-fn diff(output: &str, answer: &str) -> bool {
+fn diff(output: &[u8], answer: &[u8]) -> bool {
+    let output = match str::from_utf8(&output) {
+        Ok(res) => res,
+        _ => return false,
+    };
+    let answer = match str::from_utf8(&answer) {
+        Ok(res) => res,
+        _ => return false,
+    };
     !output
         .trim_end_matches('\n')
         .split_terminator('\n')
@@ -14,28 +20,20 @@ fn diff(output: &str, answer: &str) -> bool {
         .all(|(output, answer)| output.trim_end_matches(' ') == answer.trim_end_matches(' '))
 }
 
-impl Comparer {
-    pub fn check(
-        input_file: &path::Path,
-        output_file: &path::Path,
-        answer_file: &path::Path,
-        spj: &Option<&path::Path>,
-    ) -> io::Result<bool> {
-        match spj {
-            Some(spj) => Ok(process::Command::new(spj)
-                .arg(input_file)
-                .arg(answer_file)
-                .arg(output_file)
-                .status()?
-                .success()),
-            None => {
-                let mut output = String::new();
-                fs::File::open(output_file)?.read_to_string(&mut output)?;
-                let mut answer = String::new();
-                fs::File::open(answer_file)?.read_to_string(&mut answer)?;
-                Ok(!diff(&output, &answer))
-            }
-        }
+pub fn check(
+    input_file: &path::Path,
+    output_file: &path::Path,
+    answer_file: &path::Path,
+    spj: &Option<&path::Path>,
+) -> io::Result<bool> {
+    match spj {
+        Some(spj) => Ok(process::Command::new(spj)
+            .arg(input_file)
+            .arg(answer_file)
+            .arg(output_file)
+            .status()?
+            .success()),
+        None => Ok(!diff(&fs::read(&output_file)?, &fs::read(&answer_file)?)),
     }
 }
 
@@ -47,31 +45,31 @@ mod tests {
 
     #[test]
     fn test_diff_complete_eq() {
-        assert!(!diff("hello world", "hello world"));
+        assert!(!diff(b"hello world", b"hello world"));
     }
 
     #[test]
     fn test_diff_with_empty_line_at_eof() {
-        assert!(!diff("hello world\n", "hello world"));
-        assert!(!diff("hello world", "hello world\n"));
+        assert!(!diff(b"hello world\n", b"hello world"));
+        assert!(!diff(b"hello world", b"hello world\n"));
     }
 
     #[test]
     fn test_diff_with_space_at_eol() {
-        assert!(!diff("hello world ", "hello world"));
-        assert!(!diff("hello world", "hello world "));
+        assert!(!diff(b"hello world ", b"hello world"));
+        assert!(!diff(b"hello world", b"hello world "));
     }
 
     #[test]
     fn test_diff_with_both_empty_line_at_eof_and_space_at_eol() {
-        assert!(!diff("hello world \n", "hello world"));
-        assert!(!diff("hello world", "hello world \n"));
-        assert!(!diff("hello world\n", "hello world "));
-        assert!(!diff("hello world ", "hello world\n"));
-        assert!(!diff("hello world \n", "hello world\n"));
-        assert!(!diff("hello world\n", "hello world \n"));
-        assert!(!diff("hello world\n ", "hello world\n"));
-        assert!(!diff("hello world\n", "hello world\n "));
+        assert!(!diff(b"hello world \n", b"hello world"));
+        assert!(!diff(b"hello world", b"hello world \n"));
+        assert!(!diff(b"hello world\n", b"hello world "));
+        assert!(!diff(b"hello world ", b"hello world\n"));
+        assert!(!diff(b"hello world \n", b"hello world\n"));
+        assert!(!diff(b"hello world\n", b"hello world \n"));
+        assert!(!diff(b"hello world\n ", b"hello world\n"));
+        assert!(!diff(b"hello world\n", b"hello world\n "));
     }
 
     #[test]
@@ -82,8 +80,8 @@ mod tests {
         fs::write(&file0, "hello world")?;
         fs::write(&file1, "hello world")?;
         fs::write(&file2, "helloworld")?;
-        assert!(Comparer::check(&env::temp_dir(), &file0, &file1, &None)?);
-        assert!(!Comparer::check(&env::temp_dir(), &file0, &file2, &None)?);
+        assert!(check(&env::temp_dir(), &file0, &file1, &None)?);
+        assert!(!check(&env::temp_dir(), &file0, &file2, &None)?);
         fs::remove_file(&file0)?;
         fs::remove_file(&file1)?;
         fs::remove_file(&file2)?;

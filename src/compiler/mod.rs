@@ -1,26 +1,33 @@
 use std::fs;
 use std::io;
 use std::path;
+use std::result;
 
 mod back_ends;
 
 use self::back_ends::{CGcc, CppGxx};
 
+pub type Result = result::Result<(), String>;
+
 pub fn compile(
     language: &str,
     source_file: &path::Path,
     executable_file: &path::Path,
-) -> io::Result<bool> {
-    let compiler = get_compiler(&language).unwrap();
-    compiler.compile(&source_file, &executable_file)
+) -> io::Result<Result> {
+    if let Ok(compiler) = get_compiler(&language) {
+        compiler.compile(&source_file, &executable_file)
+    } else {
+        unimplemented!("Unsupported language or compiler")
+    }
 }
 
 trait Compiler {
     fn suffix(&self) -> &'static str;
-    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> io::Result<bool>;
+    fn compile(&self, source_file: &path::Path, executable_file: &path::Path)
+        -> io::Result<Result>;
 }
 
-fn get_compiler(language: &str) -> Result<Box<dyn Compiler>, &'static str> {
+fn get_compiler(language: &str) -> result::Result<Box<dyn Compiler>, &'static str> {
     match language {
         "c.gcc" => Ok(Box::new(CGcc::new())),
         "cpp.gxx" => Ok(Box::new(CppGxx::new())),
@@ -52,7 +59,7 @@ mod tests {
         fs::write(&source_file, "#include<stdio.h>\nint main() { return 0; }")
             .expect("Failed to write source code");
         let compiler = get_compiler("c.gcc").unwrap();
-        assert!(compiler.compile(&source_file, &executable_file)?);
+        assert!(compiler.compile(&source_file, &executable_file)?.is_ok());
         assert!(Command::new(&executable_file).status()?.success());
         Ok(())
     }
@@ -64,7 +71,7 @@ mod tests {
         fs::write(&source_file, "#include<iostream>\nint main() { return 0; }")
             .expect("Failed to write source code");
         let compiler = get_compiler("cpp.gxx").unwrap();
-        assert!(compiler.compile(&source_file, &executable_file)?);
+        assert!(compiler.compile(&source_file, &executable_file)?.is_ok());
         assert!(Command::new(&executable_file).status()?.success());
         Ok(())
     }
