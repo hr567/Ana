@@ -39,9 +39,9 @@ pub fn check(
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
+
+    use tempfile;
 
     #[test]
     fn test_diff_complete_eq() {
@@ -74,14 +74,15 @@ mod tests {
 
     #[test]
     fn test_check_without_spj() -> io::Result<()> {
-        let file0 = env::temp_dir().join("test_check_without_spj.0");
-        let file1 = env::temp_dir().join("test_check_without_spj.1");
-        let file2 = env::temp_dir().join("test_check_without_spj.2");
+        let work_dir = tempfile::tempdir()?;
+        let file0 = work_dir.path().join("test_check_without_spj.0");
+        let file1 = work_dir.path().join("test_check_without_spj.1");
+        let file2 = work_dir.path().join("test_check_without_spj.2");
         fs::write(&file0, "hello world")?;
         fs::write(&file1, "hello world")?;
         fs::write(&file2, "helloworld")?;
-        assert!(check(&env::temp_dir(), &file0, &file1, &None)?);
-        assert!(!check(&env::temp_dir(), &file0, &file2, &None)?);
+        assert!(check(&file0, &file0, &file1, &None)?);
+        assert!(!check(&file0, &file0, &file2, &None)?);
         fs::remove_file(&file0)?;
         fs::remove_file(&file1)?;
         fs::remove_file(&file2)?;

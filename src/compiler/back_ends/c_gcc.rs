@@ -43,20 +43,21 @@ impl Compiler for CGcc {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use super::*;
     use std::fs;
     use std::io;
 
-    use super::*;
+    use tempfile;
 
     #[test]
     fn test_compile() -> io::Result<()> {
-        let source_file_path = env::temp_dir().join("c_compiler_test_pass.c");
+        let work_dir = tempfile::tempdir()?;
+        let source_file_path = work_dir.path().join("c_compiler_test_pass.c");
         fs::write(
             &source_file_path,
             "#include<stdio.h>\nint main() { return 0; }",
         )?;
-        let executable_file_path = env::temp_dir().join("c_compiler_test_pass.exe");
+        let executable_file_path = work_dir.path().join("c_compiler_test_pass.exe");
         assert!(CGcc::new()
             .compile(&source_file_path, &executable_file_path)?
             .is_ok());
@@ -65,12 +66,13 @@ mod tests {
 
     #[test]
     fn test_compile_failed() -> io::Result<()> {
-        let source_file_path = env::temp_dir().join("c_compiler_test_fail.c");
+        let work_dir = tempfile::tempdir()?;
+        let source_file_path = work_dir.path().join("c_compiler_test_fail.c");
         fs::write(
             &source_file_path,
             "#include<stdio.h>\nint main() { return 0 }",
         )?;
-        let executable_file_path = env::temp_dir().join("c_compiler_test_fail.exe");
+        let executable_file_path = work_dir.path().join("c_compiler_test_fail.exe");
         assert!(CGcc::new()
             .compile(&source_file_path, &executable_file_path)?
             .is_err());
