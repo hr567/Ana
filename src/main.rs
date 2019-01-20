@@ -6,7 +6,7 @@ use ana::start_judging;
 
 fn get_arguments() -> (usize, String, String) {
     let matches = clap::App::new("Ana Judge")
-        .version("0.4.3")
+        .version("0.4.4")
         .author("hr567")
         .about("A Judge for ACMers in Rust")
         .arg(

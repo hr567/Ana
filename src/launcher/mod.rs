@@ -14,10 +14,8 @@ pub enum LaunchResult {
     Pass,
     TLE,
     MLE,
-
     #[allow(dead_code)]
     OLE,
-
     RE,
 }
 
@@ -35,31 +33,26 @@ pub fn launch(
     time_limit: u64,   // ns
     memory_limit: u64, // bytes
 ) -> io::Result<Report> {
-    if !cgroup::AnaCgroup::inited() {
-        cgroup::AnaCgroup::init()?;
-    }
-
     let limit = cgroup::AnaCgroup::new(&judge_id);
-    unsafe {
-        limit.set_time_limit(time_limit)?;
-        limit.set_memory_limit(memory_limit)?;
-    }
+    limit.set_time_limit(time_limit)?;
+    limit.set_memory_limit(memory_limit)?;
 
     let status = {
-        let mut child = unshare::Command::new(&executable_file);
-
         let limit: *const cgroup::AnaCgroup = &limit;
+
+        let mut child = unshare::Command::new(&executable_file);
         child.before_unfreeze(move |child_pid| {
+            if let Err(_) = unsafe { (*limit).add_task(child_pid) } {
+                panic!("Failed to add task {} to cgroup", child_pid);
+            }
             thread::spawn(move || {
-                thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 10));
+                let timeout = time::Duration::from_nanos(time_limit + time_limit / 10);
+                thread::sleep(timeout);
                 unsafe {
                     libc::kill(child_pid as i32, libc::SIGKILL);
                 }
             });
-            match unsafe { (*limit).add_task(child_pid) } {
-                Ok(_) => Ok(()),
-                _ => panic!("Failed to add task {} to cgroup", child_pid),
-            }
+            Ok(())
         });
         child
             .env_clear()

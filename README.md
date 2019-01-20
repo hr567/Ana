@@ -5,13 +5,6 @@
 A open source judge for ACMers in Rust
 
 
-## Status
-
-Ana is ALMOST done.
-We need more test and documents
-and a few more functions.
-
-
 ## Requirements
 
 * Rust toolchain (Edition 2018 or higher)
@@ -24,6 +17,9 @@ and a few more functions.
 
 Please note that testing Ana needs root permission
 to read and write to cgroups.
+
+If you find that the time usage is less than time limit
+but the status is TLE, try again with less `max_threads`.
 
 You can use `cargo test -- --test-threads=1`
 on some computers to avoid some testing mistake.
