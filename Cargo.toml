@@ -1,9 +1,14 @@
 [package]
 name = "ana"
 description = "A judge in Rust"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["hr567 <hr567@hr567.me>"]
 edition = "2018"
+
+[features]
+default = ["gcc", "gxx"]
+gcc = []
+gxx = []
 
 [dependencies]
 clap = "2.32"
