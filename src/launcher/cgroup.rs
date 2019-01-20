@@ -103,8 +103,10 @@ impl AnaCgroup {
         AnaCgroup::cgroup_cpu_path().exists() && AnaCgroup::cgroup_memory_path().exists()
     }
 
-    pub fn new(judge_id: String) -> AnaCgroup {
-        let new_cgroup = AnaCgroup { judge_id };
+    pub fn new(judge_id: &str) -> AnaCgroup {
+        let new_cgroup = AnaCgroup {
+            judge_id: judge_id.to_string(),
+        };
         fs::create_dir(&new_cgroup.cpu_path()).expect("Failed to create cgroup");
         fs::create_dir(&new_cgroup.memory_path()).expect("Failed to create cgroup");
         new_cgroup

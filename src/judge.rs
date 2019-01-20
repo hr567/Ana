@@ -1,7 +1,8 @@
-use std::env;
 use std::fs;
 use std::io;
 use std::path;
+
+use tempfile;
 
 use super::{
     communicator::ReportSender,
@@ -14,27 +15,16 @@ use super::{
 const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 
-struct WorkDir {
-    work_dir: Box<path::Path>,
-}
+struct WorkDir(tempfile::TempDir);
 
 impl WorkDir {
-    pub fn new(id: &str) -> WorkDir {
-        let ana_work_dir = &env::var("ANA_WORK_DIR")
-            .unwrap_or_else(|_| env::temp_dir().to_str().unwrap().to_string());
-        let work_dir = path::Path::new(&ana_work_dir).join(&id).into_boxed_path();
-        fs::create_dir(&work_dir).expect("Failed to create work dir");
-        WorkDir { work_dir }
+    pub fn new() -> WorkDir {
+        let work_dir = tempfile::tempdir().expect("Failed to create work dir");
+        WorkDir(work_dir)
     }
 
     pub fn create_file(&self, filename: &str) -> Box<path::Path> {
-        self.work_dir.join(filename).into_boxed_path()
-    }
-}
-
-impl Drop for WorkDir {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.work_dir).unwrap();
+        self.0.path().join(filename).into_boxed_path()
     }
 }
 
@@ -120,7 +110,7 @@ pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
         problem,
     } = &judge_info;
 
-    let work_dir = WorkDir::new(&judge_id);
+    let work_dir = WorkDir::new();
 
     let executable_file = work_dir.create_file("main");
     let source_file = work_dir.create_file("source");
@@ -187,9 +177,8 @@ mod tests {
 
     #[test]
     fn test_work_dir() {
-        let work_dir = WorkDir::new("test_work_dir");
-        let work_dir_path = work_dir.work_dir.clone();
-        assert!(work_dir.work_dir.exists());
+        let work_dir = WorkDir::new();
+        assert!(work_dir.0.path().exists());
 
         let file_a = work_dir.create_file("a");
         assert!(file_a.parent().unwrap().exists());
@@ -198,8 +187,5 @@ mod tests {
         let file_b = work_dir.create_file("b");
         assert!(file_b.parent().unwrap().exists());
         assert!(!file_b.exists());
-
-        drop(work_dir);
-        assert!(!work_dir_path.exists());
     }
 }

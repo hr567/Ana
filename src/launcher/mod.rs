@@ -39,7 +39,7 @@ pub fn launch(
         cgroup::AnaCgroup::init()?;
     }
 
-    let limit = cgroup::AnaCgroup::new(judge_id.to_string());
+    let limit = cgroup::AnaCgroup::new(&judge_id);
     unsafe {
         limit.set_time_limit(time_limit)?;
         limit.set_memory_limit(memory_limit)?;
@@ -102,36 +102,35 @@ pub fn launch(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
     use std::fs;
     use std::io;
 
+    use tempfile;
+
     struct JudgeDir {
-        root: Box<path::Path>,
+        inner: tempfile::TempDir,
     }
 
     impl JudgeDir {
         fn new(name: &str, input_content: &str) -> io::Result<JudgeDir> {
             let res = JudgeDir {
-                root: env::temp_dir().join(name).into_boxed_path(),
+                inner: tempfile::tempdir()?,
             };
-            fs::create_dir(&res.root)?;
-            fs::write(&res.input_file(), input_content)?;
+            fs::write(&res.readme_file(), &name)?;
+            fs::write(&res.input_file(), &input_content)?;
             Ok(res)
         }
 
+        fn readme_file(&self) -> Box<path::Path> {
+            self.inner.path().join("README").into_boxed_path()
+        }
+
         fn input_file(&self) -> Box<path::Path> {
-            self.root.join("input").into_boxed_path()
+            self.inner.path().join("input").into_boxed_path()
         }
 
         fn output_file(&self) -> Box<path::Path> {
-            self.root.join("output").into_boxed_path()
-        }
-    }
-
-    impl Drop for JudgeDir {
-        fn drop(&mut self) {
-            fs::remove_dir_all(&self.root).unwrap();
+            self.inner.path().join("output").into_boxed_path()
         }
     }
 
