@@ -8,7 +8,7 @@ use libc;
 use unshare;
 
 mod cgroup;
-use self::cgroup::Cgroup;
+use cgroup::Cgroup;
 
 pub enum LaunchResult {
     Pass,

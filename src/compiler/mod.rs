@@ -4,8 +4,7 @@ use std::path;
 use std::result;
 
 mod back_ends;
-
-use self::back_ends::{CGcc, CppGxx};
+use back_ends::{CGcc, CppGxx};
 
 pub type Result = result::Result<(), String>;
 
