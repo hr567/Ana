@@ -1,12 +1,10 @@
-use std::sync;
-
 use clap;
 
 use ana::start_judging;
 
 fn get_arguments() -> (usize, String, String) {
     let matches = clap::App::new("Ana Judge")
-        .version("0.4.4")
+        .version("0.5.0")
         .author("hr567")
         .about("A Judge for ACMers in Rust")
         .arg(
@@ -51,8 +49,8 @@ fn get_arguments() -> (usize, String, String) {
 
     (
         max_threads,
-        judge_receiver_endpoint.to_string(),
-        report_sender_endpoint.to_string(),
+        judge_receiver_endpoint.to_owned(),
+        report_sender_endpoint.to_owned(),
     )
 }
 
@@ -68,9 +66,5 @@ fn main() {
     report_sender
         .bind(&report_sender_endpoint)
         .unwrap_or_else(|_| panic!("Failed to bind to {}", &report_sender_endpoint));
-    start_judging(
-        max_threads,
-        &judge_receiver,
-        &sync::Arc::new(sync::Mutex::new(report_sender)),
-    );
+    start_judging(max_threads, judge_receiver, report_sender);
 }

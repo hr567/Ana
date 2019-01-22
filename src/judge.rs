@@ -5,7 +5,6 @@ use std::path;
 use tempfile;
 
 use super::{
-    communicator::ReportSender,
     compare::check,
     compiler::compile,
     launcher::{launch, LaunchResult},
@@ -103,7 +102,7 @@ fn judge_per_test_case(
     Ok((judge_result, report.time, report.memory))
 }
 
-pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
+pub fn judge(judge_info: &JudgeInfo, send_report: impl Fn(ReportInfo)) {
     let JudgeInfo {
         id: judge_id,
         source,
@@ -119,7 +118,7 @@ pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
         .expect("Ana compiler crash when compiling source");
 
     if compile_flag.is_err() {
-        sender.send_report_information(ReportInfo::new(&judge_id, 0, JudgeResult::CE, 0.0, 0.0));
+        send_report(ReportInfo::new(&judge_id, 0, JudgeResult::CE, 0.0, 0.0));
         return;
     }
 
@@ -153,7 +152,7 @@ pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
             max_memory_usage = memory_usage;
         }
 
-        sender.send_report_information(ReportInfo::new(
+        send_report(ReportInfo::new(
             &judge_id,
             index,
             status,
@@ -162,7 +161,7 @@ pub fn judge(judge_info: &JudgeInfo, sender: &impl ReportSender) {
         ));
     }
 
-    sender.send_report_information(ReportInfo::new(
+    send_report(ReportInfo::new(
         &judge_id,
         problem.len(),
         summary_status,

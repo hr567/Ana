@@ -42,7 +42,7 @@ pub fn launch(
 
         let mut child = unshare::Command::new(&executable_file);
         child.before_unfreeze(move |child_pid| {
-            if let Err(_) = unsafe { (*limit).add_task(child_pid) } {
+            if unsafe { (*limit).add_task(child_pid).is_err() } {
                 panic!("Failed to add task {} to cgroup", child_pid);
             }
             thread::spawn(move || {

@@ -2,7 +2,7 @@ use std::fmt;
 
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ReportInfo {
     pub id: String,
     pub index: usize,
