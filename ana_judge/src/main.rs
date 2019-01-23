@@ -1,6 +1,6 @@
 use clap;
 
-use ana::start_judging;
+use ana_judge::start_judging;
 
 fn get_arguments() -> (usize, String, String) {
     let matches = clap::App::new("Ana Judge")

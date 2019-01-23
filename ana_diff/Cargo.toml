@@ -1,0 +1,8 @@
+[package]
+name = "ana_diff"
+version = "0.1.0"
+authors = ["hr567 <hr567@hr567.me>"]
+edition = "2018"
+
+[dependencies]
+tempfile = "3"

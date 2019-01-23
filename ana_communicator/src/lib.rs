@@ -1,9 +1,8 @@
 use std::sync;
 
+use ana_common::mtp;
 use tokio::prelude::*;
 use zmq;
-
-use super::mtp;
 
 pub struct Receiver(zmq::Socket);
 
@@ -48,10 +47,36 @@ impl Sender {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests_common::*;
     use super::*;
 
+    use std::fs;
     use std::io;
+    use std::path;
+
+    use uuid::prelude::*;
+
+    pub fn generate_judge_info<T: AsRef<path::Path>>(
+        source_file: T,
+        problem_file: T,
+        spj_source_file: Option<T>,
+    ) -> io::Result<mtp::JudgeInfo> {
+        let source = mtp::Source {
+            language: String::from("cpp.gxx"),
+            code: String::from_utf8(fs::read(&source_file)?).unwrap(),
+        };
+        let mut problem: mtp::Problem = serde_json::from_reader(fs::File::open(&problem_file)?)?;
+        if let Some(spj_source_file) = spj_source_file {
+            problem.checker = mtp::Source {
+                language: String::from("cpp.gxx"),
+                code: String::from_utf8(fs::read(&spj_source_file)?).unwrap(),
+            };
+        }
+        Ok(mtp::JudgeInfo {
+            id: Uuid::new_v4().to_string(),
+            source,
+            problem,
+        })
+    }
 
     #[test]
     fn test_judge_receiver() -> io::Result<()> {

@@ -5,7 +5,7 @@ RUN apt-get update && \
     pkg-config
 COPY . /Ana
 RUN cd /Ana && \
-    cargo build -v --release
+    cargo build -p ana_judge -v --release
 
 FROM ubuntu:18.04
 RUN apt-get update && \
@@ -14,6 +14,6 @@ RUN apt-get update && \
     gcc \
     g++ && \
     apt-get clean
-COPY --from=build /Ana/target/release/ana /usr/local/bin
+COPY --from=build /Ana/target/release/ana_judge /usr/local/bin
 EXPOSE 8800 8801
-CMD [ "ana" ]
+CMD [ "ana_judge" ]

@@ -5,9 +5,9 @@ use std::path;
 use tempfile;
 
 use super::{
-    compare::check,
-    compiler::compile,
-    launcher::{launch, LaunchResult},
+    ana_compiler::compile,
+    ana_diff::check,
+    ana_runner::{launch, LaunchResult},
     mtp::*,
 };
 

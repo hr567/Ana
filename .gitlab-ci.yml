@@ -12,4 +12,4 @@ test:
         pkg-config
         gcc
         g++
-    - env RUST_BACKTRACE=1 cargo test --no-fail-fast -- --test-threads=1
+    - env RUST_BACKTRACE=1 cargo test --tests --no-fail-fast -- --test-threads=1

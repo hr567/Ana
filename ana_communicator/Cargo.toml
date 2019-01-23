@@ -1,0 +1,15 @@
+[package]
+name = "ana_communicator"
+version = "0.1.0"
+authors = ["hr567 <hr567@hr567.me>"]
+edition = "2018"
+
+[dependencies]
+serde_json = "1.0"
+tokio = "0.1"
+zmq = "0.9"
+
+ana_common = { path = "../ana_common" }
+
+[dev-dependencies]
+uuid = { version = "0.7", features = ["serde", "v4"] }

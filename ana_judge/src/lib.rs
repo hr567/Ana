@@ -1,13 +1,12 @@
+mod judge;
+
 use tokio::{self, prelude::*};
 
-mod communicator;
-mod compare;
-mod compiler;
-mod judge;
-mod launcher;
-mod mtp;
-
-use communicator::*;
+use ana_common::mtp;
+use ana_communicator::*;
+use ana_compiler;
+use ana_diff;
+use ana_runner;
 
 pub fn start_judging<T, U>(max_threads: usize, judge_receiver: T, report_sender: U)
 where
@@ -33,7 +32,7 @@ where
 }
 
 #[cfg(test)]
-pub mod tests_common {
+mod tests_common {
     use super::*;
 
     use std::fs;
@@ -41,6 +40,7 @@ pub mod tests_common {
     use std::path;
     use std::thread;
 
+    use super::mtp;
     use serde_json;
     use uuid::prelude::*;
     use zmq;
@@ -136,7 +136,8 @@ pub mod tests_common {
 
 #[cfg(test)]
 mod test_normal_judge {
-    use super::tests_common::*;
+    use super::*;
+    use tests_common::*;
 
     use std::io;
 
@@ -234,7 +235,8 @@ mod test_normal_judge {
 
 #[cfg(test)]
 mod test_spj_0 {
-    use super::tests_common::*;
+    use super::*;
+    use tests_common::*;
 
     use std::io;
 
@@ -350,7 +352,8 @@ mod test_spj_0 {
 
 #[cfg(test)]
 mod test_spj_1 {
-    use super::tests_common::*;
+    use super::*;
+    use tests_common::*;
 
     use std::io;
 
