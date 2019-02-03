@@ -1,9 +1,32 @@
-[workspace]
-members = [
-    "ana_common",
-    "ana_communicator",
-    "ana_compiler",
-    "ana_diff",
-    "ana_judge",
-    "ana_runner",
-]
+[package]
+name = "ana"
+version = "0.5.0"
+description = "A judge in Rust"
+license = "MIT"
+readme = "README.md"
+repository = "https://gitlab.com/hr567/Ana"
+authors = ["hr567 <hr567@hr567.me>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.*"
+libc = "*"
+log = "0.4"
+serde = "1.*"
+serde_json = "1.*"
+serde_derive = "1.*"
+tempfile = "3.*"
+tokio = "0.1"
+tokio-threadpool = "0.1"
+unshare = "0.5"
+zmq = "0.9"
+
+[dev-dependencies]
+env_logger = "0.6.0"
+uuid = { version = "0.7", features = ["v4"] }
+
+[features]
+default = ["gcc", "gxx"]
+
+gcc = []
+gxx = []

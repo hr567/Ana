@@ -1,41 +1,44 @@
 use std::sync;
 
-use ana_common::mtp;
 use tokio::prelude::*;
+use tokio_threadpool;
 use zmq;
 
-pub struct Receiver(zmq::Socket);
+use super::mtp;
 
-impl From<zmq::Socket> for Receiver {
-    fn from(socket: zmq::Socket) -> Receiver {
-        Receiver(socket)
+pub struct JudgeReceiver(zmq::Socket);
+
+impl From<zmq::Socket> for JudgeReceiver {
+    fn from(socket: zmq::Socket) -> JudgeReceiver {
+        JudgeReceiver(socket)
     }
 }
 
-impl Stream for Receiver {
+impl Stream for JudgeReceiver {
     type Item = mtp::JudgeInfo;
     type Error = ();
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.0.recv_bytes(zmq::DONTWAIT) {
-            Ok(res) => match serde_json::from_slice(&res) {
+        match tokio_threadpool::blocking(|| self.0.recv_bytes(0).unwrap()) {
+            Ok(Async::Ready(res)) => match serde_json::from_slice(&res) {
                 Ok(res) => Ok(Async::Ready(Some(res))),
                 Err(_) => Ok(Async::Ready(None)),
             },
-            Err(_) => Ok(Async::NotReady),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(_) => Err(()),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct Sender(sync::Arc<sync::Mutex<zmq::Socket>>);
+pub struct ReportSender(sync::Arc<sync::Mutex<zmq::Socket>>);
 
-impl From<zmq::Socket> for Sender {
-    fn from(socket: zmq::Socket) -> Sender {
-        Sender(sync::Arc::new(sync::Mutex::new(socket)))
+impl From<zmq::Socket> for ReportSender {
+    fn from(socket: zmq::Socket) -> ReportSender {
+        ReportSender(sync::Arc::new(sync::Mutex::new(socket)))
     }
 }
 
-impl Sender {
+impl ReportSender {
     pub fn send_report(&self, report: mtp::ReportInfo) {
         self.0
             .lock()
@@ -86,20 +89,23 @@ mod tests {
             sender.bind("inproc://judge-receiver")?;
             sender
         };
-        let mut receiver = {
+        let receiver = {
             let receiver = context.socket(zmq::PULL)?;
             receiver.connect("inproc://judge-receiver")?;
-            Receiver::from(receiver)
+            JudgeReceiver::from(receiver)
         };
-
-        assert_eq!(receiver.poll(), Ok(Async::NotReady));
-
         let judge_info = generate_judge_info("example/source.cpp", "example/problem.json", None)?;
-        sender.send(&serde_json::to_string(&judge_info).unwrap(), 0)?;
-        assert_eq!(receiver.poll(), Ok(Async::Ready(Some(judge_info))));
 
-        sender.send("hello", 0)?;
-        assert_eq!(receiver.poll(), Ok(Async::Ready(None)));
+        tokio::run(future::lazy(move || {
+            let mut judge_iter = receiver.wait();
+            sender
+                .send(&serde_json::to_string(&judge_info).unwrap(), 0)
+                .unwrap();
+            assert_eq!(judge_iter.next(), Some(Ok(judge_info)));
+            sender.send("hello", 0).unwrap();
+            assert_eq!(judge_iter.next(), None);
+            Ok(())
+        }));
 
         Ok(())
     }
@@ -110,7 +116,7 @@ mod tests {
         let sender = {
             let sender = context.socket(zmq::PUSH)?;
             sender.bind("inproc://report-sender")?;
-            Sender::from(sender)
+            ReportSender::from(sender)
         };
         let receiver = {
             let receiver = context.socket(zmq::PULL)?;

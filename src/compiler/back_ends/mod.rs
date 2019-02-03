@@ -5,7 +5,7 @@ mod c_gcc;
 #[cfg(feature = "gxx")]
 mod cpp_gxx;
 
-pub fn get_compiler(language: &str) -> result::Result<Box<dyn Compiler>, &'static str> {
+pub fn get_compiler(language: &str) -> Result<Box<dyn Compiler>, &'static str> {
     match language {
         #[cfg(feature = "gcc")]
         "c.gcc" => Ok(Box::new(c_gcc::CGcc::new())),
@@ -28,6 +28,7 @@ fn rename_with_new_extension(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::process;
 
     use tempfile;
@@ -41,7 +42,12 @@ mod tests {
         fs::write(&source_file, "#include<stdio.h>\nint main() { return 0; }")
             .expect("Failed to write source code");
         let compiler = get_compiler("c.gcc").unwrap();
-        assert!(compiler.compile(&source_file, &executable_file)?.is_ok());
+        let pool = tokio_threadpool::ThreadPool::new();
+        let compile_result = pool
+            .spawn_handle(compiler.compile(&source_file, &executable_file))
+            .wait()
+            .unwrap();
+        assert!(compile_result);
         assert!(process::Command::new(&executable_file).status()?.success());
         Ok(())
     }
@@ -55,7 +61,12 @@ mod tests {
         fs::write(&source_file, "#include<iostream>\nint main() { return 0; }")
             .expect("Failed to write source code");
         let compiler = get_compiler("cpp.gxx").unwrap();
-        assert!(compiler.compile(&source_file, &executable_file)?.is_ok());
+        let pool = tokio_threadpool::ThreadPool::new();
+        let compile_result = pool
+            .spawn_handle(compiler.compile(&source_file, &executable_file))
+            .wait()
+            .unwrap();
+        assert!(compile_result);
         assert!(process::Command::new(&executable_file).status()?.success());
         Ok(())
     }

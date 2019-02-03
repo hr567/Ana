@@ -32,11 +32,10 @@ Run `cargo run -- --help` for more information.
 
 ## MTP
 
-Ana use ZeroMQ to communicate with online judge server.
+Ana uses ZeroMQ to communicate with online judge server.
 
-It use a REP to receive and send message.
-A message is a json string and
-is defined as following examples:
+It uses a PULL and a PUSH to receive and send message.
+A message is a json string and defined as following examples:
 
 * Judge
 
@@ -122,6 +121,15 @@ is defined as following examples:
     "memory": 1.2
   }
   ```
+
+
+## TODOs
+
+* Recover from errors
+* Limit max concurrent tasks
+* Judge test cases concurrently
+* Add documents
+* Cache problems
 
 
 ## License

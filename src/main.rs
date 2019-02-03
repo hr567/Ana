@@ -1,6 +1,8 @@
 use clap;
+use log::*;
+use zmq;
 
-use ana_judge::start_judging;
+use ana::start_judging;
 
 fn get_arguments() -> (usize, String, String) {
     let matches = clap::App::new("Ana Judge")
@@ -12,7 +14,7 @@ fn get_arguments() -> (usize, String, String) {
                 .value_name("N")
                 .long("max_threads")
                 .short("N")
-                .help("The max size of the judging thread pool")
+                .help("The max size of the judging thread pool (not support now)")
                 .env("ANA_MAX_TASKS")
                 .default_value("1")
                 .takes_value(true),
@@ -56,15 +58,16 @@ fn get_arguments() -> (usize, String, String) {
 
 fn main() {
     let (max_threads, judge_receiver_endpoint, report_sender_endpoint) = get_arguments();
-
     let context = zmq::Context::new();
     let judge_receiver = context.socket(zmq::PULL).unwrap();
     judge_receiver
         .bind(&judge_receiver_endpoint)
         .unwrap_or_else(|_| panic!("Failed to bind to {}", &judge_receiver_endpoint));
+    info!("Bind receiver on {}", &judge_receiver_endpoint);
     let report_sender = context.socket(zmq::PUSH).unwrap();
     report_sender
         .bind(&report_sender_endpoint)
         .unwrap_or_else(|_| panic!("Failed to bind to {}", &report_sender_endpoint));
+    info!("Bind sender on {}", &report_sender_endpoint);
     start_judging(max_threads, judge_receiver, report_sender);
 }

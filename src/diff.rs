@@ -24,7 +24,7 @@ pub fn check(
     input_file: &path::Path,
     output_file: &path::Path,
     answer_file: &path::Path,
-    spj: &Option<&path::Path>,
+    spj: Option<&path::Path>,
 ) -> io::Result<bool> {
     match spj {
         Some(spj) => Ok(process::Command::new(spj)
@@ -33,7 +33,10 @@ pub fn check(
             .arg(output_file)
             .status()?
             .success()),
-        None => Ok(!diff(&fs::read(&output_file)?, &fs::read(&answer_file)?)),
+        None => Ok(!diff(
+            fs::read(&output_file)?.as_slice(),
+            fs::read(&answer_file)?.as_slice(),
+        )),
     }
 }
 
@@ -80,9 +83,9 @@ mod tests {
         let file2 = work_dir.path().join("test_check_without_spj.2");
         fs::write(&file0, "hello world")?;
         fs::write(&file1, "hello world")?;
-        fs::write(&file2, "helloworld")?;
-        assert!(check(&file0, &file0, &file1, &None)?);
-        assert!(!check(&file0, &file0, &file2, &None)?);
+        fs::write(&file2, "hello_world")?;
+        assert!(check(&file0, &file0, &file1, None)?);
+        assert!(!check(&file0, &file0, &file2, None)?);
         fs::remove_file(&file0)?;
         fs::remove_file(&file1)?;
         fs::remove_file(&file2)?;
