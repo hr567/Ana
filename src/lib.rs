@@ -3,15 +3,17 @@ use std::path;
 use std::sync;
 use std::time;
 
+use log::*;
+use tempfile;
+use tokio::prelude::*;
+
 mod communicator;
 mod compiler;
 mod diff;
 mod mtp;
 mod runner;
 
-use log::*;
-use tempfile;
-use tokio::prelude::*;
+use crate::communicator::*;
 
 const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
@@ -22,7 +24,7 @@ const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 struct WorkDir(sync::Arc<tempfile::TempDir>);
 
 impl WorkDir {
-    pub fn new() -> WorkDir {
+    fn new() -> WorkDir {
         let work_dir = tempfile::tempdir().expect("Failed to create a temp dir");
         debug!("Create new work directory in {:?}", work_dir.path());
         WorkDir(sync::Arc::new(work_dir))
@@ -32,69 +34,68 @@ impl WorkDir {
         self.0.path().join(filename).into_boxed_path()
     }
 
-    pub fn source_file(&self) -> Box<path::Path> {
+    fn source_file(&self) -> Box<path::Path> {
         self.join("source")
     }
 
-    pub fn executable_file(&self) -> Box<path::Path> {
+    fn executable_file(&self) -> Box<path::Path> {
         self.join("main")
     }
 
-    pub fn input_file(&self) -> Box<path::Path> {
+    fn input_file(&self) -> Box<path::Path> {
         self.join("input")
     }
 
-    pub fn output_file(&self) -> Box<path::Path> {
+    fn output_file(&self) -> Box<path::Path> {
         self.join("output")
     }
 
-    pub fn answer_file(&self) -> Box<path::Path> {
+    fn answer_file(&self) -> Box<path::Path> {
         self.join("answer")
     }
 
-    pub fn spj_source_file(&self) -> Box<path::Path> {
+    fn spj_source_file(&self) -> Box<path::Path> {
         self.join("spj_source")
     }
 
-    pub fn spj_executable_file(&self) -> Box<path::Path> {
+    fn spj_executable_file(&self) -> Box<path::Path> {
         self.join("spj")
     }
 }
 
 /// The entry of judging
 /// Generate reports for every task from receiver and send them
-pub fn start_judging<T, U>(_max_threads: usize, judge_receiver: T, report_sender: U)
-where
-    T: Into<communicator::JudgeReceiver>,
-    U: Into<communicator::ReportSender>,
-{
-    info!("Judging is starting");
+pub fn start_judging<
+    T: communicator::Receiver + Send + 'static,
+    U: communicator::Sender + Send + 'static,
+>(
+    _max_threads: usize,
+    judge_receiver: impl Into<communicator::TaskReceiver<T>>,
+    report_sender: impl Into<communicator::ReportSender<U>>,
+) {
     let judge_receiver = judge_receiver.into();
     let report_sender = report_sender.into();
-    let pool = tokio_threadpool::ThreadPool::new();
     let server = judge_receiver.for_each(move |judge_info| {
         debug!("Received judge information: {:?}", &judge_info);
         let report_sender = report_sender.clone();
         let task = judge(judge_info).and_then(move |reports| {
             debug!("Generated judge reports: {:?}", &reports);
             for report in reports {
-                report_sender.send_report(report);
+                report_sender
+                    .send(report)
+                    .unwrap_or_else(|_| error!("Failed to send report."));
             }
             Ok(())
         });
         tokio::spawn(task);
         Ok(())
     });
-    pool.spawn(server);
-    pool.shutdown_on_idle()
-        .wait()
-        .expect("Failed to wait thread pool to shutdown");
-    info!("Judging is done");
+    tokio::run(server);
 }
 
-fn judge(judge_info: mtp::JudgeInfo) -> impl Future<Item = Vec<mtp::ReportInfo>, Error = ()> {
+fn judge(judge_info: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>, Error = ()> {
     let work_dir = WorkDir::new();
-    let mtp::JudgeInfo {
+    let mtp::JudgeTask {
         id,
         source,
         problem,
@@ -155,7 +156,7 @@ fn judge(judge_info: mtp::JudgeInfo) -> impl Future<Item = Vec<mtp::ReportInfo>,
                 });
                 task.wait().unwrap();
             }
-            let mut reports: Vec<mtp::ReportInfo> = Vec::new();
+            let mut reports: Vec<mtp::JudgeReport> = Vec::new();
             for _ in 0..problem_length {
                 let report = report_receiver.recv().unwrap();
                 reports.push(report);
@@ -163,7 +164,7 @@ fn judge(judge_info: mtp::JudgeInfo) -> impl Future<Item = Vec<mtp::ReportInfo>,
             debug!("Collected reports: {:?}", &reports);
             Ok(reports)
         } else {
-            Ok(vec![mtp::ReportInfo::new(
+            Ok(vec![mtp::JudgeReport::new(
                 &id,
                 0,
                 mtp::JudgeResult::CE,
@@ -189,7 +190,7 @@ fn generate_report_from_work_dir(
     problem_type: mtp::ProblemType,
     time_limit: u64,
     memory_limit: u64,
-) -> mtp::ReportInfo {
+) -> mtp::JudgeReport {
     let runner::LaunchResult {
         exit_code,
         real_time_usage,
@@ -209,7 +210,7 @@ fn generate_report_from_work_dir(
     } else {
         mtp::JudgeResult::WA
     };
-    mtp::ReportInfo::new(
+    mtp::JudgeReport::new(
         &judge_id,
         index,
         status,
@@ -257,8 +258,8 @@ fn build_special_judge(
     spj_source: mtp::Source,
 ) -> impl Future<Item = bool, Error = ()> {
     let mtp::Source { language, code } = spj_source;
-    let spj_source_file = work_dir.join("spj_source");
-    let spj_executable_file = work_dir.join("spj");
+    let spj_source_file = work_dir.spj_source_file();
+    let spj_executable_file = work_dir.spj_executable_file();
     tokio::fs::File::create(work_dir.spj_source_file())
         .and_then(move |mut file| file.poll_write(code.as_bytes()))
         .then(move |_res| compiler::compile(&language, &spj_source_file, &spj_executable_file))
@@ -287,10 +288,7 @@ fn check_output(work_dir: &WorkDir, problem_type: mtp::ProblemType) -> bool {
 mod tests_common {
     use super::*;
 
-    use std::fs;
     use std::io;
-    use std::path;
-    use std::sync;
 
     use serde_json;
     use tokio_threadpool;
@@ -312,7 +310,7 @@ mod tests_common {
         pub fn new(name: &str) -> Judge {
             INIT_LOG.call_once(|| env_logger::init());
 
-            debug!("Start judging {}", &name);
+            debug!("Start test judging {}", &name);
             let (judge_sender, judge_receiver) =
                 create_zmq_socket_pair(&format!("inproc://{}-judge", &name));
             let (report_sender, report_receiver) =
@@ -329,13 +327,13 @@ mod tests_common {
             }
         }
 
-        pub fn send_judge(&self, judge_info: &mtp::JudgeInfo) {
+        pub fn send_judge(&self, judge_task: &mtp::JudgeTask) {
             self.judge_sender
-                .send(&serde_json::to_string(&judge_info).unwrap(), 0)
+                .send(&serde_json::to_string(&judge_task).unwrap(), 0)
                 .unwrap();
         }
 
-        pub fn receive_report(&self) -> mtp::ReportInfo {
+        pub fn receive_report(&self) -> mtp::JudgeReport {
             let report_json = self.report_receiver.recv_string(0).unwrap().unwrap();
             serde_json::from_str(&report_json).unwrap()
         }
@@ -362,7 +360,7 @@ mod tests_common {
         source_file: T,
         problem_file: T,
         spj_source_file: Option<T>,
-    ) -> io::Result<mtp::JudgeInfo> {
+    ) -> io::Result<mtp::JudgeTask> {
         let source = mtp::Source {
             language: String::from("cpp.gxx"),
             code: String::from_utf8(fs::read(&source_file)?).unwrap(),
@@ -374,7 +372,7 @@ mod tests_common {
                 code: String::from_utf8(fs::read(&spj_source_file)?).unwrap(),
             };
         }
-        Ok(mtp::JudgeInfo {
+        Ok(mtp::JudgeTask {
             id: Uuid::new_v4().to_string(),
             source,
             problem,
@@ -382,7 +380,7 @@ mod tests_common {
     }
 
     pub fn assert_report_with_limit(
-        report: &mtp::ReportInfo,
+        report: &mtp::JudgeReport,
         id: &str,
         index: usize,
         status: &str,

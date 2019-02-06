@@ -3,7 +3,7 @@ use std::fmt;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct JudgeInfo {
+pub struct JudgeTask {
     pub id: String,
     pub source: Source,
     pub problem: Problem,
@@ -51,7 +51,7 @@ pub struct Source {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ReportInfo {
+pub struct JudgeReport {
     pub id: String,
     pub index: usize,
     pub status: String,
@@ -59,10 +59,10 @@ pub struct ReportInfo {
     pub memory: f64,
 }
 
-impl ReportInfo {
-    pub fn new(id: &str, index: usize, status: JudgeResult, time: f64, memory: f64) -> ReportInfo {
-        ReportInfo {
-            id: String::from(id),
+impl JudgeReport {
+    pub fn new(id: &str, index: usize, status: JudgeResult, time: f64, memory: f64) -> JudgeReport {
+        JudgeReport {
+            id: id.to_string(),
             index,
             status: status.to_string(),
             time,
