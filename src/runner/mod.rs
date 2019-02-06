@@ -30,7 +30,14 @@ pub fn launch(
 ) -> impl Future<Item = LaunchResult, Error = ()> {
     let cg = cgroup::Cgroup::new(&name, time_limit, memory_limit);
     let mut child = unshare::Command::new(&executable_file);
-    let cgroup_hook = cg.add_process_method();
+    let cgroup_hook = {
+        let cpu_procs = cg.cpu_cgroup_path().join("cgroup.procs");
+        let memory_procs = cg.memory_cgroup_path().join("cgroup.procs");
+        move |pid: u32| {
+            fs::write(&cpu_procs, format!("{}", pid)).unwrap();
+            fs::write(&memory_procs, format!("{}", pid)).unwrap();
+        }
+    };
     child.before_unfreeze(move |pid| {
         cgroup_hook(pid);
         Ok(())
@@ -57,7 +64,7 @@ pub fn launch(
         cg,
         child: child.spawn().expect("Failed to execute program"),
         start_time: time::Instant::now(),
-        deadline: time::Instant::now() + time::Duration::from_nanos(time_limit * 2),
+        deadline: time::Instant::now() + time::Duration::from_nanos(time_limit * 5),
     }
 }
 

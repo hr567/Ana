@@ -17,13 +17,13 @@ pub struct Cgroup {
 }
 
 impl Cgroup {
-    fn cpu_cgroup_path(&self) -> Box<path::Path> {
+    pub fn cpu_cgroup_path(&self) -> Box<path::Path> {
         path::Path::new(CPU_CGROUP_PATH)
             .join(&self.name)
             .into_boxed_path()
     }
 
-    fn memory_cgroup_path(&self) -> Box<path::Path> {
+    pub fn memory_cgroup_path(&self) -> Box<path::Path> {
         path::Path::new(MEMORY_CGROUP_PATH)
             .join(&self.name)
             .into_boxed_path()
@@ -60,59 +60,36 @@ impl Cgroup {
     }
 }
 
-impl Drop for Cgroup {
-    fn drop(&mut self) {
-        fs::remove_dir(self.cpu_cgroup_path()).expect("Failed to remove cpu cgroup");
-        fs::remove_dir(self.memory_cgroup_path()).expect("Failed to remove memory cgroup");
-        debug!("Sub cgroup {} is removed", &self.name);
-    }
-}
-
 impl Cgroup {
     pub fn new(name: &str, cpu_time_limit: u64, memory_usage_limit: u64) -> Cgroup {
         INIT_ANA_CGROUP.call_once(|| {
-            fs::create_dir_all(CPU_CGROUP_PATH).expect("Failed to create cgroup");
-            fs::create_dir_all(MEMORY_CGROUP_PATH).expect("Failed to create cgroup");
-            debug!("Ana cgroup is created");
+            debug!(
+                "Ana cgroup is created in {} and {}",
+                CPU_CGROUP_PATH, MEMORY_CGROUP_PATH,
+            );
+            fs::create_dir_all(CPU_CGROUP_PATH).expect("Failed to create cpu cgroup");
+            fs::create_dir_all(MEMORY_CGROUP_PATH).expect("Failed to create memory cgroup");
         });
         let res = Cgroup {
             name: name.to_string(),
             cpu_time_limit,
             memory_usage_limit,
         };
-        debug!("Creating sub-cgroup {}", &name);
-        fs::create_dir(res.cpu_cgroup_path()).expect("Failed to create cpu cgroup");
-        fs::create_dir(res.memory_cgroup_path()).expect("Failed to create memory cgroup");
+        fs::create_dir(res.cpu_cgroup_path()).unwrap();
+        fs::create_dir(res.memory_cgroup_path()).unwrap();
         debug!("Sub-cgroup {} is created", &name);
         res.apply_cpu_time_limit();
         res.apply_memory_usage_limit();
         res
     }
 
-    pub fn add_process_method(&self) -> impl Fn(u32) {
-        let cpu_procs = self
-            .cpu_cgroup_path()
-            .join("cgroup.procs")
-            .into_boxed_path();
-        let memory_proc = self
-            .memory_cgroup_path()
-            .join("cgroup.procs")
-            .into_boxed_path();
-        move |pid: u32| {
-            fs::write(&cpu_procs, format!("{}", pid)).unwrap();
-            fs::write(&memory_proc, format!("{}", pid)).unwrap();
-        }
-    }
-
     pub fn get_cpu_time_usage(&self) -> u64 {
-        let buf = fs::read(&self.cpu_cgroup_path().join("cpuacct.usage"))
-            .expect("Failed to read cpu usage");
+        let buf = fs::read(&self.cpu_cgroup_path().join("cpuacct.usage")).unwrap();
         str::from_utf8(&buf).unwrap().trim().parse().unwrap()
     }
 
     pub fn get_memory_usage(&self) -> u64 {
-        let buf = fs::read(&self.memory_cgroup_path().join("memory.max_usage_in_bytes"))
-            .expect("Failed to read memory usage");
+        let buf = fs::read(&self.memory_cgroup_path().join("memory.max_usage_in_bytes")).unwrap();
         str::from_utf8(&buf).unwrap().trim().parse().unwrap()
     }
 
@@ -121,12 +98,19 @@ impl Cgroup {
     }
 
     fn memory_fail_count(&self) -> usize {
-        let buf = fs::read(&self.memory_cgroup_path().join("memory.failcnt"))
-            .expect("Failed to read memory fail count");
+        let buf = fs::read(&self.memory_cgroup_path().join("memory.failcnt")).unwrap();
         str::from_utf8(&buf).unwrap().trim().parse().unwrap()
     }
 
     pub fn is_memory_limit_exceeded(&self) -> bool {
         self.memory_fail_count() != 0
+    }
+}
+
+impl Drop for Cgroup {
+    fn drop(&mut self) {
+        fs::remove_dir(self.cpu_cgroup_path()).unwrap();
+        fs::remove_dir(self.memory_cgroup_path()).unwrap();
+        debug!("Sub cgroup {} is removed", &self.name);
     }
 }
