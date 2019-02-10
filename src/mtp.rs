@@ -3,38 +3,35 @@ use std::fmt;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(tag = "type")]
+pub enum Problem {
+    Normal {
+        time_limit: f64,
+        memory_limit: f64,
+        test_cases: Vec<TestCase>,
+    },
+    Special {
+        time_limit: f64,
+        memory_limit: f64,
+        test_cases: Vec<TestCase>,
+        spj: Source,
+    },
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct JudgeTask {
     pub id: String,
     pub source: Source,
     pub problem: Problem,
 }
 
-#[derive(Clone, Copy)]
-pub enum ProblemType {
-    Normal,
-    Special,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Problem {
-    pub problem_type: String,
-    pub time_limit: f64,
-    pub memory_limit: f64,
-    pub checker: Source,
-    pub test_cases: Vec<TestCase>,
-}
-
 impl Problem {
-    pub fn get_type(&self) -> ProblemType {
-        match self.problem_type.as_str() {
-            "normal" => ProblemType::Normal,
-            "spj" => ProblemType::Special,
-            _ => unimplemented!("Not support problem type {}", self.problem_type),
-        }
-    }
-
     pub fn len(&self) -> usize {
-        self.test_cases.len()
+        use Problem::*;
+        match self {
+            Normal { test_cases, .. } => test_cases.len(),
+            Special { test_cases, .. } => test_cases.len(),
+        }
     }
 }
 

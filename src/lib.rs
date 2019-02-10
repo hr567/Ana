@@ -104,24 +104,27 @@ fn judge(judge_info: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
     compile_source(work_dir.clone(), source).and_then(move |compile_success| {
         if compile_success {
             debug!("Compile success");
-            let problem_length = problem.len();
-            let problem_type = problem.get_type();
-            let mtp::Problem {
-                time_limit,
-                memory_limit,
-                checker,
-                test_cases,
-                ..
-            } = problem;
+            let (time_limit, memory_limit, test_cases) = match problem {
+                mtp::Problem::Normal {
+                    time_limit,
+                    memory_limit,
+                    test_cases,
+                } => (time_limit, memory_limit, test_cases),
+                mtp::Problem::Special {
+                    time_limit,
+                    memory_limit,
+                    test_cases,
+                    spj,
+                } => {
+                    debug!("Building special judge");
+                    let build_spj_result =
+                        build_special_judge(work_dir.clone(), spj).wait().unwrap();
+                    assert!(build_spj_result, "Failed to build special judge");
+                    (time_limit, memory_limit, test_cases)
+                }
+            };
             let time_limit = (time_limit * NS_PER_SEC) as u64;
             let memory_limit = (memory_limit * BYTES_PER_MB) as u64;
-            if let mtp::ProblemType::Special = problem_type {
-                debug!("Building special judge");
-                let build_spj_result = build_special_judge(work_dir.clone(), checker)
-                    .wait()
-                    .unwrap();
-                assert!(build_spj_result, "Failed to build special judge");
-            }
             let (report_sender, report_receiver) = sync::mpsc::channel();
             for (index, test_case) in test_cases.into_iter().enumerate() {
                 debug!("Testing test case #{}", index);
@@ -145,7 +148,6 @@ fn judge(judge_info: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
                         &id,
                         index,
                         launch_result,
-                        problem_type,
                         time_limit,
                         memory_limit,
                     );
@@ -156,12 +158,15 @@ fn judge(judge_info: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
                 });
                 task.wait().unwrap();
             }
-            let mut reports: Vec<mtp::JudgeReport> = Vec::new();
-            for _ in 0..problem_length {
-                let report = report_receiver.recv().unwrap();
-                reports.push(report);
-            }
-            debug!("Collected reports: {:?}", &reports);
+
+            // let mut reports: Vec<mtp::JudgeReport> = Vec::new();
+            // for _ in 0..problem_length {
+            //     let report = report_receiver.recv().unwrap();
+            //     reports.push(report);
+            // }
+            // debug!("Collected reports: {:?}", &reports);
+            // Ok(reports)
+            let reports: Vec<mtp::JudgeReport> = report_receiver.iter().collect();
             Ok(reports)
         } else {
             Ok(vec![mtp::JudgeReport::new(
@@ -187,7 +192,6 @@ fn generate_report_from_work_dir(
     judge_id: &str,
     index: usize,
     launch_result: runner::LaunchResult,
-    problem_type: mtp::ProblemType,
     time_limit: u64,
     memory_limit: u64,
 ) -> mtp::JudgeReport {
@@ -205,7 +209,7 @@ fn generate_report_from_work_dir(
         mtp::JudgeResult::TLE
     } else if exit_code != 0 {
         mtp::JudgeResult::RE
-    } else if check_output(&work_dir, problem_type) {
+    } else if check_output(&work_dir) {
         mtp::JudgeResult::AC
     } else {
         mtp::JudgeResult::WA
@@ -265,30 +269,20 @@ fn build_special_judge(
         .then(move |_res| compiler::compile(&language, &spj_source_file, &spj_executable_file))
 }
 
-fn check_output(work_dir: &WorkDir, problem_type: mtp::ProblemType) -> bool {
-    use mtp::ProblemType::*;
-    match problem_type {
-        Normal => diff::check(
-            &work_dir.input_file(),
-            &work_dir.output_file(),
-            &work_dir.answer_file(),
-            None,
-        ),
-        Special => diff::check(
-            &work_dir.input_file(),
-            &work_dir.output_file(),
-            &work_dir.answer_file(),
-            Some(&work_dir.spj_executable_file()),
-        ),
-    }
+fn check_output(work_dir: &WorkDir) -> bool {
+    let spj = work_dir.spj_executable_file();
+    diff::check(
+        &work_dir.input_file(),
+        &work_dir.output_file(),
+        &work_dir.answer_file(),
+        if !spj.exists() { None } else { Some(&spj) },
+    )
     .unwrap_or(false)
 }
 
 #[cfg(test)]
 mod tests_common {
     use super::*;
-
-    use std::io;
 
     use serde_json;
     use tokio_threadpool;
@@ -359,24 +353,20 @@ mod tests_common {
     pub fn generate_judge_info<T: AsRef<path::Path>>(
         source_file: T,
         problem_file: T,
-        spj_source_file: Option<T>,
-    ) -> io::Result<mtp::JudgeTask> {
+    ) -> mtp::JudgeTask {
+        let source_code = fs::read(&source_file).unwrap();
+        let source_code = String::from_utf8(source_code).unwrap();
         let source = mtp::Source {
             language: String::from("cpp.gxx"),
-            code: String::from_utf8(fs::read(&source_file)?).unwrap(),
+            code: source_code,
         };
-        let mut problem: mtp::Problem = serde_json::from_reader(fs::File::open(&problem_file)?)?;
-        if let Some(spj_source_file) = spj_source_file {
-            problem.checker = mtp::Source {
-                language: String::from("cpp.gxx"),
-                code: String::from_utf8(fs::read(&spj_source_file)?).unwrap(),
-            };
-        }
-        Ok(mtp::JudgeTask {
+        let problem_file = fs::File::open(&problem_file).unwrap();
+        let problem = serde_json::from_reader(problem_file).unwrap();
+        mtp::JudgeTask {
             id: Uuid::new_v4().to_string(),
             source,
             problem,
-        })
+        }
     }
 
     pub fn assert_report_with_limit(
@@ -400,11 +390,9 @@ mod test_normal_judge {
     use super::*;
     use tests_common::*;
 
-    use std::io;
-
     #[test]
-    fn test_normal_judge_with_ac() -> io::Result<()> {
-        let judge_info = generate_judge_info("example/source.cpp", "example/problem.json", None)?;
+    fn test_normal_judge_with_ac() {
+        let judge_info = generate_judge_info("example/source.cpp", "example/problem.json");
         let judge = Judge::new("test_normal_judge_with_ac");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -412,24 +400,20 @@ mod test_normal_judge {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "AC", 1.0, 32.0);
         }
-        Ok(())
     }
 
     #[test]
-    fn test_normal_judge_with_ce() -> io::Result<()> {
-        let judge_info =
-            generate_judge_info("example/source.ce.cpp", "example/problem.json", None)?;
+    fn test_normal_judge_with_ce() {
+        let judge_info = generate_judge_info("example/source.ce.cpp", "example/problem.json");
         let judge = Judge::new("test_normal_judge_with_ce");
         judge.send_judge(&judge_info);
         let report = judge.receive_report();
         assert_report_with_limit(&report.into(), &judge_info.id, 0, "CE", 1.0, 32.0);
-        Ok(())
     }
 
     #[test]
-    fn test_normal_judge_with_mle() -> io::Result<()> {
-        let judge_info =
-            generate_judge_info("example/source.mle.cpp", "example/problem.json", None)?;
+    fn test_normal_judge_with_mle() {
+        let judge_info = generate_judge_info("example/source.mle.cpp", "example/problem.json");
         let judge = Judge::new("test_normal_judge_with_mle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -443,26 +427,22 @@ mod test_normal_judge {
                 32.0 + MEMORY_EPS,
             );
         }
-        Ok(())
     }
 
     #[test]
-    fn test_normal_judge_with_re() -> io::Result<()> {
-        let judge_info =
-            generate_judge_info("example/source.re.cpp", "example/problem.json", None)?;
+    fn test_normal_judge_with_re() {
+        let judge_info = generate_judge_info("example/source.re.cpp", "example/problem.json");
         let judge = Judge::new("test_normal_judge_with_re");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "RE", 1.0, 32.0);
         }
-        Ok(())
     }
 
     #[test]
-    fn test_normal_judge_with_tle() -> io::Result<()> {
-        let judge_info =
-            generate_judge_info("example/source.tle.cpp", "example/problem.json", None)?;
+    fn test_normal_judge_with_tle() {
+        let judge_info = generate_judge_info("example/source.tle.cpp", "example/problem.json");
         let judge = Judge::new("test_normal_judge_with_tle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -476,22 +456,18 @@ mod test_normal_judge {
                 32.0,
             );
         }
-        Ok(())
     }
 
     #[test]
-    fn test_normal_judge_with_wa() -> io::Result<()> {
-        let judge_info =
-            generate_judge_info("example/source.wa.cpp", "example/problem.json", None)?;
+    fn test_normal_judge_with_wa() {
+        let judge_info = generate_judge_info("example/source.wa.cpp", "example/problem.json");
         let judge = Judge::new("test_normal_judge_with_wa");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "WA", 1.0, 32.0);
         }
-        Ok(())
     }
-
 }
 
 #[cfg(test)]
@@ -499,45 +475,29 @@ mod test_spj_0 {
     use super::*;
     use tests_common::*;
 
-    use std::io;
-
     #[test]
-    fn test_spj_0_with_ac() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.0.cpp"),
-        )?;
+    fn test_spj_0_with_ac() {
+        let judge_info = generate_judge_info("example/source.cpp", "example/spj_problem_0.json");
         let judge = Judge::new("test_special_judge_0_with_ac");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "AC", 1.0, 32.0);
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_0_with_ce() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.ce.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.0.cpp"),
-        )?;
+    fn test_spj_0_with_ce() {
+        let judge_info = generate_judge_info("example/source.ce.cpp", "example/spj_problem_0.json");
         let judge = Judge::new("test_special_judge_0_with_ce");
         judge.send_judge(&judge_info);
         let report = judge.receive_report();
         assert_report_with_limit(&report.into(), &judge_info.id, 0, "CE", 1.0, 32.0);
-        Ok(())
     }
 
     #[test]
-    fn test_spj_0_with_mle() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.mle.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.0.cpp"),
-        )?;
+    fn test_spj_0_with_mle() {
+        let judge_info = generate_judge_info("example/source.mle.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_0_with_mle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -551,32 +511,22 @@ mod test_spj_0 {
                 32.0 + MEMORY_EPS,
             );
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_0_with_re() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.re.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.0.cpp"),
-        )?;
+    fn test_spj_0_with_re() {
+        let judge_info = generate_judge_info("example/source.re.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_0_with_re");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "RE", 1.0, 32.0);
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_0_with_tle() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.tle.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.0.cpp"),
-        )?;
+    fn test_spj_0_with_tle() {
+        let judge_info = generate_judge_info("example/source.tle.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_0_with_tle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -590,23 +540,17 @@ mod test_spj_0 {
                 32.0,
             );
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_0_with_wa() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.wa.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.0.cpp"),
-        )?;
+    fn test_spj_0_with_wa() {
+        let judge_info = generate_judge_info("example/source.wa.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_0_with_wa");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "WA", 1.0, 32.0);
         }
-        Ok(())
     }
 
 }
@@ -616,45 +560,29 @@ mod test_spj_1 {
     use super::*;
     use tests_common::*;
 
-    use std::io;
-
     #[test]
-    fn test_spj_1_with_ac() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.1.cpp"),
-        )?;
+    fn test_spj_1_with_ac() {
+        let judge_info = generate_judge_info("example/source.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_1_with_ac");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "AC", 1.0, 32.0);
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_1_with_ce() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.ce.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.1.cpp"),
-        )?;
+    fn test_spj_1_with_ce() {
+        let judge_info = generate_judge_info("example/source.ce.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_1_with_ce");
         judge.send_judge(&judge_info);
         let report = judge.receive_report();
         assert_report_with_limit(&report.into(), &judge_info.id, 0, "CE", 1.0, 32.0);
-        Ok(())
     }
 
     #[test]
-    fn test_spj_1_with_mle() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.mle.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.1.cpp"),
-        )?;
+    fn test_spj_1_with_mle() {
+        let judge_info = generate_judge_info("example/source.mle.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_1_with_mle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -668,32 +596,22 @@ mod test_spj_1 {
                 32.0 + MEMORY_EPS,
             );
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_1_with_re() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.re.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.1.cpp"),
-        )?;
+    fn test_spj_1_with_re() {
+        let judge_info = generate_judge_info("example/source.re.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_1_with_re");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "RE", 1.0, 32.0);
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_1_with_tle() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.tle.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.1.cpp"),
-        )?;
+    fn test_spj_1_with_tle() {
+        let judge_info = generate_judge_info("example/source.tle.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_1_with_tle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -707,22 +625,16 @@ mod test_spj_1 {
                 32.0,
             );
         }
-        Ok(())
     }
 
     #[test]
-    fn test_spj_1_with_wa() -> io::Result<()> {
-        let judge_info = generate_judge_info(
-            "example/source.wa.cpp",
-            "example/spj_problem.json",
-            Some("example/spj.1.cpp"),
-        )?;
+    fn test_spj_1_with_wa() {
+        let judge_info = generate_judge_info("example/source.wa.cpp", "example/spj_problem.json");
         let judge = Judge::new("test_special_judge_1_with_wa");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(&report.into(), &judge_info.id, i, "WA", 1.0, 32.0);
         }
-        Ok(())
     }
 }

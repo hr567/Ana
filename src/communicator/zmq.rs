@@ -46,29 +46,23 @@ mod tests {
     fn generate_judge_task<T: AsRef<path::Path>>(
         source_file: T,
         problem_file: T,
-        spj_source_file: Option<T>,
-    ) -> io::Result<mtp::JudgeTask> {
+    ) -> mtp::JudgeTask {
         let source = mtp::Source {
             language: String::from("cpp.gxx"),
-            code: String::from_utf8(fs::read(&source_file)?).unwrap(),
+            code: String::from_utf8(fs::read(&source_file).unwrap()).unwrap(),
         };
-        let mut problem: mtp::Problem = serde_json::from_reader(fs::File::open(&problem_file)?)?;
-        if let Some(spj_source_file) = spj_source_file {
-            problem.checker = mtp::Source {
-                language: String::from("cpp.gxx"),
-                code: String::from_utf8(fs::read(&spj_source_file)?).unwrap(),
-            };
-        }
-        Ok(mtp::JudgeTask {
+        let problem: mtp::Problem =
+            serde_json::from_reader(fs::File::open(&problem_file).unwrap()).unwrap();
+        mtp::JudgeTask {
             id: Uuid::new_v4().to_string(),
             source,
             problem,
-        })
+        }
     }
 
     #[test]
     fn test_judge_receiver() -> io::Result<()> {
-        let judge_task = generate_judge_task("example/source.cpp", "example/problem.json", None)?;
+        let judge_task = generate_judge_task("example/source.cpp", "example/problem.json");
         let judge_task_json = serde_json::to_string(&judge_task).unwrap();
 
         let context = zmq::Context::new();
