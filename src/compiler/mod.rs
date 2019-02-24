@@ -1,7 +1,9 @@
+/// Interface for different compilers
 use std::fs;
 use std::io;
 use std::path;
 use std::process;
+use std::str;
 
 use tokio::prelude::*;
 use tokio_threadpool;
@@ -22,18 +24,18 @@ pub fn compile(
 }
 
 pub trait Compiler {
-    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> CompilingTask;
+    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> CompileFuture;
 }
 
-pub struct CompilingTask(process::Child);
+pub struct CompileFuture(process::Child);
 
-impl From<process::Child> for CompilingTask {
-    fn from(child: process::Child) -> CompilingTask {
-        CompilingTask(child)
+impl From<process::Child> for CompileFuture {
+    fn from(child: process::Child) -> CompileFuture {
+        CompileFuture(child)
     }
 }
 
-impl Future for CompilingTask {
+impl Future for CompileFuture {
     type Item = bool;
     type Error = ();
     fn poll(&mut self) -> Poll<bool, ()> {

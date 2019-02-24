@@ -123,6 +123,34 @@ A message is a json string and defined as following examples:
   ```
 
 
+## Workspace
+```
+workspace
+├── id                // Judge ID
+├── problem
+│   ├── time_limit    // time limit in ns
+│   ├── memory_limit  // memory limit in byte
+│   ├── 0
+│   │   ├── answer    // file contains answer
+│   │   ├── input     // file contains input
+│   │   └── output    // file contains input
+│   ├── 1
+│   │   └── ..        // same as 0
+│   ├── 2
+│   │   └── ..        // same as 0
+│   ├── ..            // more test cases
+│   └── spj           // same as source if spj is available
+│       ├── spj
+│       ├── lang
+│       └── source
+├── runtime -> /      // directory for chroot
+└── source            // directory for source code and compiled program
+    ├── main          // executable file
+    ├── lang          // language of the code
+    └── source        // source code
+```
+
+
 ## TODOs
 
 * Recover from errors

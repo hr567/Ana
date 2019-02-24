@@ -1,10 +1,7 @@
-use std::fs;
-use std::path;
 use std::sync;
 use std::time;
 
 use log::*;
-use tempfile;
 use tokio::prelude::*;
 
 mod communicator;
@@ -12,67 +9,26 @@ mod compiler;
 mod diff;
 mod mtp;
 mod runner;
+mod workspace;
 
 use crate::communicator::*;
+
+use workspace::*;
 
 const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 
-/// A simple wrapper for TempDir
-/// Add some methods to get special files
-#[derive(Clone)]
-struct WorkDir(sync::Arc<tempfile::TempDir>);
-
-impl WorkDir {
-    fn new() -> WorkDir {
-        let work_dir = tempfile::tempdir().expect("Failed to create a temp dir");
-        debug!("Create new work directory in {:?}", work_dir.path());
-        WorkDir(sync::Arc::new(work_dir))
-    }
-
-    fn join(&self, filename: &str) -> Box<path::Path> {
-        self.0.path().join(filename).into_boxed_path()
-    }
-
-    fn source_file(&self) -> Box<path::Path> {
-        self.join("source")
-    }
-
-    fn executable_file(&self) -> Box<path::Path> {
-        self.join("main")
-    }
-
-    fn input_file(&self) -> Box<path::Path> {
-        self.join("input")
-    }
-
-    fn output_file(&self) -> Box<path::Path> {
-        self.join("output")
-    }
-
-    fn answer_file(&self) -> Box<path::Path> {
-        self.join("answer")
-    }
-
-    fn spj_source_file(&self) -> Box<path::Path> {
-        self.join("spj_source")
-    }
-
-    fn spj_executable_file(&self) -> Box<path::Path> {
-        self.join("spj")
-    }
-}
-
 /// The entry of judging
 /// Generate reports for every task from receiver and send them
-pub fn start_judging<
-    T: communicator::Receiver + Send + 'static,
-    U: communicator::Sender + Send + 'static,
->(
-    _max_threads: usize,
+pub fn start_judging<T, U>(
+    _max_compile_threads: usize,
+    _max_judge_threads: usize,
     judge_receiver: impl Into<communicator::TaskReceiver<T>>,
     report_sender: impl Into<communicator::ReportSender<U>>,
-) {
+) where
+    T: communicator::Receiver + Send + 'static,
+    U: communicator::Sender + Send + 'static,
+{
     let judge_receiver = judge_receiver.into();
     let report_sender = report_sender.into();
     let server = judge_receiver.for_each(move |judge_info| {
@@ -83,7 +39,7 @@ pub fn start_judging<
             for report in reports {
                 report_sender
                     .send(report)
-                    .unwrap_or_else(|_| error!("Failed to send report."));
+                    .unwrap_or_else(|_| error!("Failed to send report"));
             }
             Ok(())
         });
@@ -93,84 +49,50 @@ pub fn start_judging<
     tokio::run(server);
 }
 
-fn judge(judge_info: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>, Error = ()> {
-    let work_dir = WorkDir::new();
-    let mtp::JudgeTask {
-        id,
-        source,
-        problem,
-    } = judge_info;
+fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>, Error = ()> {
+    debug!("Start judging task :{}", &judge_task.id);
+    let work_dir = workspace::WorkSpace::new();
+    work_dir.prepare_judge_task(judge_task);
     debug!("Start compiling source code");
-    compile_source(work_dir.clone(), source).and_then(move |compile_success| {
+    generate_compile_future(work_dir.clone()).and_then(move |compile_success| {
         if compile_success {
             debug!("Compile success");
-            let (time_limit, memory_limit, test_cases) = match problem {
-                mtp::Problem::Normal {
-                    time_limit,
-                    memory_limit,
-                    test_cases,
-                } => (time_limit, memory_limit, test_cases),
-                mtp::Problem::Special {
-                    time_limit,
-                    memory_limit,
-                    test_cases,
-                    spj,
-                } => {
-                    debug!("Building special judge");
-                    let build_spj_result =
-                        build_special_judge(work_dir.clone(), spj).wait().unwrap();
-                    assert!(build_spj_result, "Failed to build special judge");
-                    (time_limit, memory_limit, test_cases)
-                }
-            };
-            let time_limit = (time_limit * NS_PER_SEC) as u64;
-            let memory_limit = (memory_limit * BYTES_PER_MB) as u64;
-            let (report_sender, report_receiver) = sync::mpsc::channel();
-            for (index, test_case) in test_cases.into_iter().enumerate() {
-                debug!("Testing test case #{}", index);
-                let report_sender = report_sender.clone();
-                let id = id.clone();
-                let work_dir = work_dir.clone();
-                let mtp::TestCase { input, answer } = test_case;
-                let task = launch_program(
-                    work_dir.clone(),
-                    id.clone(),
-                    input,
-                    time_limit,
-                    memory_limit,
-                )
-                .and_then(move |launch_result| {
-                    debug!("[#{}] Program is exited", index);
-                    fs::write(work_dir.answer_file(), answer)
-                        .expect("Failed to write to answer file");
-                    let report = generate_report_from_work_dir(
-                        work_dir.clone(),
-                        &id,
-                        index,
-                        launch_result,
-                        time_limit,
-                        memory_limit,
-                    );
-                    debug!("[#{}] Generated report: {:?}", index, &report);
-                    report_sender.send(report).unwrap();
-                    debug!("[#{}] Report has been sent", index);
-                    Ok(())
-                });
-                task.wait().unwrap();
+
+            if work_dir.problem_dir().spj_path().exists() {
+                assert!(
+                    build_special_judge(work_dir.clone()).expect("Failed to build special judge"),
+                    "Failed to build special judge"
+                );
             }
 
-            // let mut reports: Vec<mtp::JudgeReport> = Vec::new();
-            // for _ in 0..problem_length {
-            //     let report = report_receiver.recv().unwrap();
-            //     reports.push(report);
-            // }
-            // debug!("Collected reports: {:?}", &reports);
-            // Ok(reports)
+            let (report_sender, report_receiver) = sync::mpsc::channel();
+            for (index, task) in generate_launch_future(work_dir.clone())
+                .into_iter()
+                .enumerate()
+            {
+                debug!("Testing test case #{}", index);
+                // Clone these values for the move lambda
+                let report_sender = report_sender.clone();
+                let work_dir = work_dir.clone();
+
+                let task = task.and_then(move |launch_result| {
+                    debug!("[#{}] Program is exited", index);
+                    let report = generate_report_from_work_dir(work_dir, index, launch_result);
+                    debug!("[#{}] Generated report: {:?}", index, &report);
+                    report_sender.send(report).unwrap();
+                    Ok(())
+                });
+                // tokio::spawn(task);
+                task.wait().unwrap();
+                debug!("[#{}] Task finished", index);
+            }
+            drop(report_sender);
             let reports: Vec<mtp::JudgeReport> = report_receiver.iter().collect();
+            debug!("Collected reports: {:?}", &reports);
             Ok(reports)
         } else {
             Ok(vec![mtp::JudgeReport::new(
-                &id,
+                &work_dir.get_id(),
                 0,
                 mtp::JudgeResult::CE,
                 0.0,
@@ -188,12 +110,9 @@ fn judge(judge_info: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
 /// real time usage means that there are too many
 /// threads working in one time or the program use sleep.
 fn generate_report_from_work_dir(
-    work_dir: WorkDir,
-    judge_id: &str,
+    work_dir: workspace::WorkSpace,
     index: usize,
     launch_result: runner::LaunchResult,
-    time_limit: u64,
-    memory_limit: u64,
 ) -> mtp::JudgeReport {
     let runner::LaunchResult {
         exit_code,
@@ -203,19 +122,22 @@ fn generate_report_from_work_dir(
         tle_flag,
         mle_flag,
     } = launch_result;
-    let status = if mle_flag || memory_usage >= memory_limit {
+    let status = if mle_flag || memory_usage >= work_dir.problem_dir().get_memory_limit() {
         mtp::JudgeResult::MLE
-    } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit * 10) {
+    } else if tle_flag
+        || real_time_usage
+            >= time::Duration::from_nanos(work_dir.problem_dir().get_time_limit() * 10)
+    {
         mtp::JudgeResult::TLE
     } else if exit_code != 0 {
         mtp::JudgeResult::RE
-    } else if check_output(&work_dir) {
+    } else if check_output(&work_dir, index) {
         mtp::JudgeResult::AC
     } else {
         mtp::JudgeResult::WA
     };
     mtp::JudgeReport::new(
-        &judge_id,
+        &work_dir.get_id(),
         index,
         status,
         cpu_time_usage as f64 / NS_PER_SEC,
@@ -223,29 +145,28 @@ fn generate_report_from_work_dir(
     )
 }
 
-fn compile_source(work_dir: WorkDir, source: mtp::Source) -> impl Future<Item = bool, Error = ()> {
-    let source_file = work_dir.source_file();
-    let executable_file = work_dir.executable_file();
-    let mtp::Source { language, code } = source;
-    tokio::fs::File::create(work_dir.source_file())
-        .and_then(move |mut file| file.poll_write(code.as_bytes()))
-        .then(move |_| compiler::compile(&language, &source_file, &executable_file))
+fn generate_compile_future(work_dir: workspace::WorkSpace) -> impl Future<Item = bool, Error = ()> {
+    let language = work_dir.source_dir().get_language();
+    let source_file = work_dir.source_dir().source_file();
+    let executable_file = work_dir.source_dir().executable_file();
+    compiler::compile(&language, &source_file, &executable_file)
 }
 
-fn launch_program(
-    work_dir: WorkDir,
-    id: String,
-    input: String,
-    time_limit: u64,
-    memory_limit: u64,
-) -> impl Future<Item = runner::LaunchResult, Error = ()> {
-    let executable_file = work_dir.executable_file();
-    assert!(executable_file.exists());
-    let input_file = work_dir.input_file();
-    let output_file = work_dir.output_file();
-    tokio::fs::File::create(work_dir.input_file())
-        .and_then(move |mut file| file.poll_write(input.as_bytes()))
-        .then(move |_| {
+fn generate_launch_future(
+    work_dir: workspace::WorkSpace,
+) -> Vec<impl Future<Item = runner::LaunchResult, Error = ()>> {
+    let mut res = Vec::new();
+    let id = work_dir.get_id();
+    let time_limit = work_dir.problem_dir().get_time_limit();
+    let memory_limit = work_dir.problem_dir().get_memory_limit();
+
+    for test_case in work_dir.problem_dir().test_cases() {
+        let id = id.clone();
+        let executable_file = work_dir.source_dir().executable_file();
+        let input_file = test_case.input_file();
+        let output_file = test_case.output_file();
+
+        let task = future::lazy(move || {
             runner::launch(
                 &id,
                 &executable_file,
@@ -254,38 +175,47 @@ fn launch_program(
                 time_limit,
                 memory_limit,
             )
-        })
+        });
+        res.push(task);
+    }
+    res
 }
 
-fn build_special_judge(
-    work_dir: WorkDir,
-    spj_source: mtp::Source,
-) -> impl Future<Item = bool, Error = ()> {
-    let mtp::Source { language, code } = spj_source;
-    let spj_source_file = work_dir.spj_source_file();
-    let spj_executable_file = work_dir.spj_executable_file();
-    tokio::fs::File::create(work_dir.spj_source_file())
-        .and_then(move |mut file| file.poll_write(code.as_bytes()))
-        .then(move |_res| compiler::compile(&language, &spj_source_file, &spj_executable_file))
+fn build_special_judge(work_dir: workspace::WorkSpace) -> Result<bool, ()> {
+    let language = work_dir.spj_path().get_language();
+    let spj_source_file = work_dir.spj_path().source_file();
+    let spj_executable_file = work_dir.spj_path().executable_file();
+    compiler::compile(&language, &spj_source_file, &spj_executable_file).wait()
 }
 
-fn check_output(work_dir: &WorkDir) -> bool {
-    let spj = work_dir.spj_executable_file();
-    diff::check(
-        &work_dir.input_file(),
-        &work_dir.output_file(),
-        &work_dir.answer_file(),
-        if !spj.exists() { None } else { Some(&spj) },
-    )
-    .unwrap_or(false)
+fn check_output(work_dir: &WorkSpace, index: usize) -> bool {
+    if let Some(test_case_dir) = work_dir.test_cases().get(index) {
+        let spj = work_dir.spj_path().executable_file();
+        diff::check(
+            &test_case_dir.input_file(),
+            &test_case_dir.output_file(),
+            &test_case_dir.answer_file(),
+            if work_dir.spj_path().exists() {
+                Some(&spj)
+            } else {
+                None
+            },
+        )
+        .unwrap_or(false)
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests_common {
     use super::*;
 
+    use std::fs;
+    use std::path;
+    use std::thread;
+
     use serde_json;
-    use tokio_threadpool;
     use uuid::prelude::*;
     use zmq;
 
@@ -295,7 +225,6 @@ mod tests_common {
     pub struct Judge {
         judge_sender: zmq::Socket,
         report_receiver: zmq::Socket,
-        thread_pool_handler: Option<tokio_threadpool::Shutdown>,
     }
 
     static INIT_LOG: sync::Once = sync::Once::new();
@@ -309,15 +238,12 @@ mod tests_common {
                 create_zmq_socket_pair(&format!("inproc://{}-judge", &name));
             let (report_sender, report_receiver) =
                 create_zmq_socket_pair(&format!("inproc://{}-report", &name));
-            let pool = tokio_threadpool::ThreadPool::new();
-            pool.spawn(future::lazy(move || {
-                start_judging(1, judge_receiver, report_sender);
-                Ok(())
-            }));
+            thread::spawn(move || {
+                start_judging(1, 1, judge_receiver, report_sender);
+            });
             Judge {
                 judge_sender,
                 report_receiver,
-                thread_pool_handler: Some(pool.shutdown()),
             }
         }
 
@@ -337,7 +263,6 @@ mod tests_common {
         fn drop(&mut self) {
             debug!("Dropping judge task");
             self.judge_sender.send("EOF", 0).unwrap();
-            self.thread_pool_handler.take().unwrap().wait().unwrap();
         }
     }
 
@@ -390,9 +315,11 @@ mod test_normal_judge {
     use super::*;
     use tests_common::*;
 
+    const PROBLEM: &str = "example/problem.json";
+
     #[test]
     fn test_normal_judge_with_ac() {
-        let judge_info = generate_judge_info("example/source.cpp", "example/problem.json");
+        let judge_info = generate_judge_info("example/source.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_ac");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -404,7 +331,7 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_ce() {
-        let judge_info = generate_judge_info("example/source.ce.cpp", "example/problem.json");
+        let judge_info = generate_judge_info("example/source.ce.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_ce");
         judge.send_judge(&judge_info);
         let report = judge.receive_report();
@@ -413,7 +340,7 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_mle() {
-        let judge_info = generate_judge_info("example/source.mle.cpp", "example/problem.json");
+        let judge_info = generate_judge_info("example/source.mle.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_mle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -431,7 +358,7 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_re() {
-        let judge_info = generate_judge_info("example/source.re.cpp", "example/problem.json");
+        let judge_info = generate_judge_info("example/source.re.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_re");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -442,7 +369,7 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_tle() {
-        let judge_info = generate_judge_info("example/source.tle.cpp", "example/problem.json");
+        let judge_info = generate_judge_info("example/source.tle.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_tle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -460,7 +387,7 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_wa() {
-        let judge_info = generate_judge_info("example/source.wa.cpp", "example/problem.json");
+        let judge_info = generate_judge_info("example/source.wa.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_wa");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -475,9 +402,11 @@ mod test_spj_0 {
     use super::*;
     use tests_common::*;
 
+    const PROBLEM: &str = "example/spj_problem_0.json";
+
     #[test]
     fn test_spj_0_with_ac() {
-        let judge_info = generate_judge_info("example/source.cpp", "example/spj_problem_0.json");
+        let judge_info = generate_judge_info("example/source.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_ac");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -488,7 +417,7 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_ce() {
-        let judge_info = generate_judge_info("example/source.ce.cpp", "example/spj_problem_0.json");
+        let judge_info = generate_judge_info("example/source.ce.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_ce");
         judge.send_judge(&judge_info);
         let report = judge.receive_report();
@@ -497,7 +426,7 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_mle() {
-        let judge_info = generate_judge_info("example/source.mle.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.mle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_mle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -515,7 +444,7 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_re() {
-        let judge_info = generate_judge_info("example/source.re.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.re.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_re");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -526,7 +455,7 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_tle() {
-        let judge_info = generate_judge_info("example/source.tle.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.tle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_tle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -544,7 +473,7 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_wa() {
-        let judge_info = generate_judge_info("example/source.wa.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.wa.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_wa");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -560,9 +489,11 @@ mod test_spj_1 {
     use super::*;
     use tests_common::*;
 
+    const PROBLEM: &str = "example/spj_problem_1.json";
+
     #[test]
     fn test_spj_1_with_ac() {
-        let judge_info = generate_judge_info("example/source.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_ac");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -573,7 +504,7 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_ce() {
-        let judge_info = generate_judge_info("example/source.ce.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.ce.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_ce");
         judge.send_judge(&judge_info);
         let report = judge.receive_report();
@@ -582,7 +513,7 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_mle() {
-        let judge_info = generate_judge_info("example/source.mle.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.mle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_mle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -600,7 +531,7 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_re() {
-        let judge_info = generate_judge_info("example/source.re.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.re.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_re");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -611,7 +542,7 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_tle() {
-        let judge_info = generate_judge_info("example/source.tle.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.tle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_tle");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {
@@ -629,7 +560,7 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_wa() {
-        let judge_info = generate_judge_info("example/source.wa.cpp", "example/spj_problem.json");
+        let judge_info = generate_judge_info("example/source.wa.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_wa");
         judge.send_judge(&judge_info);
         for i in 0..judge_info.problem.len() {

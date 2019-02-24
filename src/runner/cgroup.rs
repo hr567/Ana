@@ -70,17 +70,17 @@ impl Cgroup {
             fs::create_dir_all(CPU_CGROUP_PATH).expect("Failed to create cpu cgroup");
             fs::create_dir_all(MEMORY_CGROUP_PATH).expect("Failed to create memory cgroup");
         });
-        let res = Cgroup {
+        let ret = Cgroup {
             name: name.to_string(),
             cpu_time_limit,
             memory_usage_limit,
         };
-        fs::create_dir(res.cpu_cgroup_path()).unwrap();
-        fs::create_dir(res.memory_cgroup_path()).unwrap();
+        fs::create_dir(ret.cpu_cgroup_path()).unwrap();
+        fs::create_dir(ret.memory_cgroup_path()).unwrap();
         debug!("Sub-cgroup {} is created", &name);
-        res.apply_cpu_time_limit();
-        res.apply_memory_usage_limit();
-        res
+        ret.apply_cpu_time_limit();
+        ret.apply_memory_usage_limit();
+        ret
     }
 
     pub fn get_cpu_time_usage(&self) -> u64 {

@@ -3,7 +3,7 @@ use std::path;
 use std::thread;
 use std::time;
 
-use libc;
+use nix;
 use tokio::prelude::*;
 use tokio_threadpool;
 use unshare;
@@ -40,6 +40,11 @@ pub fn launch(
     };
     child.before_unfreeze(move |pid| {
         cgroup_hook(pid);
+        thread::spawn(move || {
+            use nix::{sys::signal, unistd::Pid};
+            thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 5));
+            let _res = signal::kill(Pid::from_raw(pid as i32), Some(signal::SIGKILL));
+        });
         Ok(())
     });
     child
@@ -60,42 +65,37 @@ pub fn launch(
         .stdout(unshare::Stdio::from_file(
             fs::File::create(&output_file).expect("Failed to create output file"),
         ));
-    LaunchingTask {
+    LaunchFuture {
         cg,
-        child: child.spawn().expect("Failed to execute program"),
+        child,
         start_time: time::Instant::now(),
-        deadline: time::Instant::now() + time::Duration::from_nanos(time_limit * 5),
     }
 }
 
-pub struct LaunchingTask {
+pub struct LaunchFuture {
     cg: cgroup::Cgroup,
-    child: unshare::Child,
+    child: unshare::Command,
     start_time: time::Instant,
-    deadline: time::Instant,
 }
 
-impl Future for LaunchingTask {
+unsafe impl Send for LaunchFuture {}
+
+impl Future for LaunchFuture {
     type Item = LaunchResult;
     type Error = ();
     fn poll(&mut self) -> Poll<LaunchResult, ()> {
-        let child_pid = self.child.pid();
-        let deadline = self.deadline;
-        thread::spawn(move || {
-            thread::sleep(deadline.duration_since(time::Instant::now()));
-            unsafe {
-                libc::kill(child_pid, libc::SIGKILL);
+        match tokio_threadpool::blocking(|| self.child.status().unwrap()) {
+            Ok(Async::Ready(status)) => {
+                let res = LaunchResult {
+                    exit_code: status.code().unwrap_or(-1),
+                    real_time_usage: time::Instant::now() - self.start_time,
+                    cpu_time_usage: self.cg.get_cpu_time_usage(),
+                    memory_usage: self.cg.get_memory_usage(),
+                    tle_flag: self.cg.is_time_limit_exceeded(),
+                    mle_flag: self.cg.is_memory_limit_exceeded(),
+                };
+                Ok(Async::Ready(res))
             }
-        });
-        match tokio_threadpool::blocking(|| self.child.wait().unwrap()) {
-            Ok(Async::Ready(status)) => Ok(Async::Ready(LaunchResult {
-                exit_code: status.code().unwrap_or(-1),
-                real_time_usage: time::Instant::now() - self.start_time,
-                cpu_time_usage: self.cg.get_cpu_time_usage(),
-                memory_usage: self.cg.get_memory_usage(),
-                tle_flag: self.cg.is_time_limit_exceeded(),
-                mle_flag: self.cg.is_memory_limit_exceeded(),
-            })),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(_) => Err(()),
         }

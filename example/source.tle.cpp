@@ -2,11 +2,11 @@
 using namespace std;
 
 int main() {
-  int a, b;
-  while (cin >> a >> b) {
-    cout << a + b << endl;
-  }
-  while (true) {
-  }
-  return 0;
+    int a, b;
+    while (cin >> a >> b) {
+        cout << a + b << endl;
+    }
+    while (true) {
+    }
+    return 0;
 }

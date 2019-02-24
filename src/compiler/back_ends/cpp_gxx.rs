@@ -12,7 +12,7 @@ impl CppGxx {
 }
 
 impl Compiler for CppGxx {
-    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> CompilingTask {
+    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> CompileFuture {
         let source_file =
             rename_with_new_extension(&source_file, "cpp").expect("Failed to rename source file");
         process::Command::new("g++")

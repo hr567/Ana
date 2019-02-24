@@ -14,13 +14,16 @@ pub enum Error {
 
 /// The `Receiver` trait allows for receiving judge task
 pub trait Receiver {
-    /// Receive a JudgeTask (may block current thread)
+    /// Receive a JudgeTask
+    ///
+    /// This method should block current thread until
+    /// it receive a judge task and then return it.
     fn receive(&self) -> Result<mtp::JudgeTask, Error>;
 }
 
 /// The `Sender` trait allows for sending judge report
 pub trait Sender {
-    /// Send a JudgeReport (may block current thread)
+    /// Send a JudgeReport
     fn send(&self, report: mtp::JudgeReport) -> Result<(), Error>;
 }
 
