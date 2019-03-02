@@ -27,7 +27,7 @@ pub struct WorkSpace {
 }
 
 impl WorkSpace {
-    pub fn new() -> WorkSpace {
+    pub fn new(judge_task: mtp::JudgeTask) -> WorkSpace {
         let workspace = WorkSpace {
             inner: sync::Arc::new(TempDir(
                 tempfile::tempdir().expect("Failed to create a temp dir"),
@@ -48,6 +48,16 @@ impl WorkSpace {
             .unwrap();
 
         debug!("Create new workspace in {:?}", &workspace.inner.0);
+
+        let mtp::JudgeTask {
+            id,
+            source,
+            problem,
+        } = judge_task;
+        fs::write(workspace.id_file(), id).unwrap();
+        workspace.init_source_dir(source);
+        workspace.init_problem_dir(problem);
+
         workspace
     }
 
@@ -83,19 +93,6 @@ impl WorkSpace {
     pub fn get_id(&self) -> String {
         let id = fs::read(self.id_file()).unwrap();
         String::from_utf8(id).unwrap()
-    }
-}
-
-impl WorkSpace {
-    pub fn prepare_judge_task(&self, judge_task: mtp::JudgeTask) {
-        let mtp::JudgeTask {
-            id,
-            source,
-            problem,
-        } = judge_task;
-        fs::write(self.id_file(), id).unwrap();
-        self.init_source_dir(source);
-        self.init_problem_dir(problem);
     }
 }
 

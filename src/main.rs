@@ -75,17 +75,22 @@ fn get_arguments() -> (usize, usize, String, String) {
 fn main() {
     let (max_compile_threads, max_judge_threads, judge_receiver_endpoint, report_sender_endpoint) =
         get_arguments();
+
     let context = zmq::Context::new();
+
     let judge_receiver = context.socket(zmq::PULL).unwrap();
     judge_receiver
         .bind(&judge_receiver_endpoint)
         .unwrap_or_else(|_| panic!("Failed to bind to {}", &judge_receiver_endpoint));
-    info!("Bind receiver on {}", &judge_receiver_endpoint);
+    debug!("Judge receiver bind on {}", &judge_receiver_endpoint);
+
     let report_sender = context.socket(zmq::PUSH).unwrap();
     report_sender
         .bind(&report_sender_endpoint)
         .unwrap_or_else(|_| panic!("Failed to bind to {}", &report_sender_endpoint));
-    info!("Bind sender on {}", &report_sender_endpoint);
+    debug!("Report sender bind on {}", &report_sender_endpoint);
+
+    info!("Ana start judging");
     start_judging(
         max_compile_threads,
         max_judge_threads,

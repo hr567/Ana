@@ -18,7 +18,7 @@ const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
 
 /// The entry of judging
-/// Generate reports for every task from receiver and send them
+/// Generate reports for every task from receiver and then send them
 pub fn start_judging<T, U>(
     _max_compile_threads: usize,
     _max_judge_threads: usize,
@@ -48,15 +48,12 @@ pub fn start_judging<T, U>(
     tokio::run(server);
 }
 
+/// Judge the task and generate a list of reports
 fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>, Error = ()> {
     debug!("Start judging task :{}", &judge_task.id);
-    let work_dir = WorkSpace::new();
-    work_dir.prepare_judge_task(judge_task);
-    debug!("Start compiling source code");
+    let work_dir = WorkSpace::new(judge_task);
     generate_compile_future(work_dir.clone()).and_then(move |compile_success| {
         if compile_success {
-            debug!("Compile success");
-
             work_dir.remount_runtime_dir();
             if work_dir.problem_dir().spj_path().exists() {
                 assert!(
@@ -76,7 +73,6 @@ fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
                 let work_dir = work_dir.clone();
 
                 let task = task.and_then(move |launch_result| {
-                    debug!("[#{}] Program is exited", index);
                     let report = generate_report(work_dir, index, launch_result);
                     debug!("[#{}] Generated report: {:?}", index, &report);
                     report_sender.send(report).unwrap();
@@ -113,8 +109,8 @@ fn generate_report(
     launch_result: runner::LaunchResult,
 ) -> mtp::JudgeReport {
     let id = work_dir.get_id();
-    let time_limit = work_dir.problem_dir().get_time_limit();
-    let memory_limit = work_dir.problem_dir().get_memory_limit();
+    let time_limit = work_dir.problem_dir().time_limit();
+    let memory_limit = work_dir.problem_dir().memory_limit();
     let case_dir = work_dir.problem_dir().get_test_case_path(index).unwrap();
     let input_file = case_dir.input_file();
     let output_file = case_dir.output_file();
@@ -131,7 +127,7 @@ fn generate_report(
     } = launch_result;
     let status = if mle_flag || memory_usage >= memory_limit {
         mtp::JudgeResult::MLE
-    } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit * 10) {
+    } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit / 2 * 3) {
         mtp::JudgeResult::TLE
     } else if exit_code != 0 {
         mtp::JudgeResult::RE
@@ -171,8 +167,8 @@ fn generate_launch_future(
     work_dir: WorkSpace,
 ) -> Vec<impl Future<Item = runner::LaunchResult, Error = ()>> {
     let mut res = Vec::new();
-    let time_limit = work_dir.problem_dir().get_time_limit();
-    let memory_limit = work_dir.problem_dir().get_memory_limit();
+    let time_limit = work_dir.problem_dir().time_limit();
+    let memory_limit = work_dir.problem_dir().memory_limit();
 
     for test_case in work_dir.problem_dir().test_cases() {
         let runtime_dir = work_dir.runtime_dir();
@@ -268,7 +264,7 @@ mod tests_common {
         (sender, receiver)
     }
 
-    pub fn generate_judge_info<T: AsRef<path::Path>>(
+    pub fn generate_judge_task<T: AsRef<path::Path>>(
         source_file: T,
         problem_file: T,
     ) -> mtp::JudgeTask {
@@ -310,34 +306,34 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_ac() {
-        let judge_info = generate_judge_info("example/source.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_ac");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "AC", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "AC", 1.0, 32.0);
         }
     }
 
     #[test]
     fn test_normal_judge_with_ce() {
-        let judge_info = generate_judge_info("example/source.ce.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.ce.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_ce");
-        judge.send_judge(&judge_info);
+        judge.send_judge(&judge_task);
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, "CE", 1.0, 32.0);
+        assert_report_with_limit(&report.into(), &judge_task.id, "CE", 1.0, 32.0);
     }
 
     #[test]
     fn test_normal_judge_with_mle() {
-        let judge_info = generate_judge_info("example/source.mle.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.mle.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_mle");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(
                 &report.into(),
-                &judge_info.id,
+                &judge_task.id,
                 "MLE",
                 1.0,
                 32.0 + MEMORY_EPS,
@@ -347,34 +343,34 @@ mod test_normal_judge {
 
     #[test]
     fn test_normal_judge_with_re() {
-        let judge_info = generate_judge_info("example/source.re.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.re.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_re");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "RE", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "RE", 1.0, 32.0);
         }
     }
 
     #[test]
     fn test_normal_judge_with_tle() {
-        let judge_info = generate_judge_info("example/source.tle.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.tle.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_tle");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "TLE", 1.0 + TIME_EPS, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "TLE", 1.0 + TIME_EPS, 32.0);
         }
     }
 
     #[test]
     fn test_normal_judge_with_wa() {
-        let judge_info = generate_judge_info("example/source.wa.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.wa.cpp", PROBLEM);
         let judge = Judge::new("test_normal_judge_with_wa");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "WA", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "WA", 1.0, 32.0);
         }
     }
 }
@@ -388,34 +384,34 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_ac() {
-        let judge_info = generate_judge_info("example/source.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_ac");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "AC", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "AC", 1.0, 32.0);
         }
     }
 
     #[test]
     fn test_spj_0_with_ce() {
-        let judge_info = generate_judge_info("example/source.ce.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.ce.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_ce");
-        judge.send_judge(&judge_info);
+        judge.send_judge(&judge_task);
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, "CE", 1.0, 32.0);
+        assert_report_with_limit(&report.into(), &judge_task.id, "CE", 1.0, 32.0);
     }
 
     #[test]
     fn test_spj_0_with_mle() {
-        let judge_info = generate_judge_info("example/source.mle.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.mle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_mle");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(
                 &report.into(),
-                &judge_info.id,
+                &judge_task.id,
                 "MLE",
                 1.0,
                 32.0 + MEMORY_EPS,
@@ -425,34 +421,34 @@ mod test_spj_0 {
 
     #[test]
     fn test_spj_0_with_re() {
-        let judge_info = generate_judge_info("example/source.re.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.re.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_re");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "RE", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "RE", 1.0, 32.0);
         }
     }
 
     #[test]
     fn test_spj_0_with_tle() {
-        let judge_info = generate_judge_info("example/source.tle.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.tle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_tle");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "TLE", 1.0 + TIME_EPS, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "TLE", 1.0 + TIME_EPS, 32.0);
         }
     }
 
     #[test]
     fn test_spj_0_with_wa() {
-        let judge_info = generate_judge_info("example/source.wa.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.wa.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_0_with_wa");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "WA", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "WA", 1.0, 32.0);
         }
     }
 
@@ -467,34 +463,34 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_ac() {
-        let judge_info = generate_judge_info("example/source.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_ac");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "AC", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "AC", 1.0, 32.0);
         }
     }
 
     #[test]
     fn test_spj_1_with_ce() {
-        let judge_info = generate_judge_info("example/source.ce.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.ce.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_ce");
-        judge.send_judge(&judge_info);
+        judge.send_judge(&judge_task);
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_info.id, "CE", 1.0, 32.0);
+        assert_report_with_limit(&report.into(), &judge_task.id, "CE", 1.0, 32.0);
     }
 
     #[test]
     fn test_spj_1_with_mle() {
-        let judge_info = generate_judge_info("example/source.mle.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.mle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_mle");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
             assert_report_with_limit(
                 &report.into(),
-                &judge_info.id,
+                &judge_task.id,
                 "MLE",
                 1.0,
                 32.0 + MEMORY_EPS,
@@ -504,34 +500,34 @@ mod test_spj_1 {
 
     #[test]
     fn test_spj_1_with_re() {
-        let judge_info = generate_judge_info("example/source.re.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.re.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_re");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "RE", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "RE", 1.0, 32.0);
         }
     }
 
     #[test]
     fn test_spj_1_with_tle() {
-        let judge_info = generate_judge_info("example/source.tle.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.tle.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_tle");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "TLE", 1.0 + TIME_EPS, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "TLE", 1.0 + TIME_EPS, 32.0);
         }
     }
 
     #[test]
     fn test_spj_1_with_wa() {
-        let judge_info = generate_judge_info("example/source.wa.cpp", PROBLEM);
+        let judge_task = generate_judge_task("example/source.wa.cpp", PROBLEM);
         let judge = Judge::new("test_special_judge_1_with_wa");
-        judge.send_judge(&judge_info);
-        for _i in 0..judge_info.problem.len() {
+        judge.send_judge(&judge_task);
+        for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_info.id, "WA", 1.0, 32.0);
+            assert_report_with_limit(&report.into(), &judge_task.id, "WA", 1.0, 32.0);
         }
     }
 }

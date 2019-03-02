@@ -6,10 +6,12 @@ stages:
 test:
   stage: test
   script:
+    - export RUST_BACKTRACE=1
+    - export RUST_LOG=debug
     - apt-get update
     - apt-get install -y
-        libzmq3-dev
-        pkg-config
-        gcc
-        g++
-    - env RUST_BACKTRACE=1 cargo test --tests --no-fail-fast -- --test-threads=1
+      libzmq3-dev
+      pkg-config
+      gcc
+      g++
+    - cargo test --tests --no-fail-fast -- --test-threads=1

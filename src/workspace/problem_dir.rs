@@ -93,7 +93,7 @@ pub trait ProblemDir {
         res
     }
 
-    fn get_time_limit(&self) -> u64 {
+    fn time_limit(&self) -> u64 {
         let time_limit = fs::read(self.time_limit_file()).unwrap();
         String::from_utf8(time_limit)
             .unwrap()
@@ -102,7 +102,7 @@ pub trait ProblemDir {
             .unwrap()
     }
 
-    fn get_memory_limit(&self) -> u64 {
+    fn memory_limit(&self) -> u64 {
         let memory_limit = fs::read(self.memory_limit_file()).unwrap();
         String::from_utf8(memory_limit)
             .unwrap()

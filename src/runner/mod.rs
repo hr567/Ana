@@ -38,7 +38,7 @@ pub fn launch(
             fs::write(&memory_procs, format!("{}", pid))
                 .expect("Failed to write to memory cgroup processes");
             thread::spawn(move || {
-                thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 5));
+                thread::sleep(time::Duration::from_nanos(time_limit / 2 * 3));
                 let _res = nix::sys::signal::kill(
                     nix::unistd::Pid::from_raw(pid as i32),
                     Some(nix::sys::signal::SIGKILL),

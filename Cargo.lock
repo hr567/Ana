@@ -8,7 +8,7 @@ dependencies = [
 
 [[package]]
 name = "ana"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
