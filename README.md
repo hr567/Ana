@@ -143,9 +143,9 @@ workspace
 │       ├── spj
 │       ├── lang
 │       └── source
-├── runtime -> /      // directory for chroot
+├── runtime           // chroot directory (empty)
+|   └── main          // executable file
 └── source            // directory for source code and compiled program
-    ├── main          // executable file
     ├── lang          // language of the code
     └── source        // source code
 ```
@@ -158,6 +158,7 @@ workspace
 * Judge test cases concurrently
 * Add documents
 * Cache problems
+* Use Fuse to reduce memory usage
 
 
 ## License

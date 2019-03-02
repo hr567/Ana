@@ -35,18 +35,18 @@ impl WorkSpace {
         };
 
         libmount::Tmpfs::new(&workspace)
+            .mode(0o700)
             .mount()
             .expect("Failed to mount tmpfs on workspace");
 
         fs::create_dir(workspace.source_dir()).unwrap();
         fs::create_dir(workspace.problem_dir()).unwrap();
-
         fs::create_dir(workspace.runtime_dir()).unwrap();
-        libmount::BindMount::new("/", workspace.runtime_dir())
-            .readonly(true)
-            .recursive(false)
+
+        libmount::Tmpfs::new(&workspace.runtime_dir())
             .mount()
-            .expect("Failed to bind root");
+            .unwrap();
+
         debug!("Create new workspace in {:?}", &workspace.inner.0);
         workspace
     }
@@ -69,6 +69,13 @@ impl WorkSpace {
 
     pub fn problem_dir(&self) -> Box<path::Path> {
         self.join("problem")
+    }
+
+    pub fn remount_runtime_dir(&self) {
+        libmount::Remount::new(&self.runtime_dir())
+            .readonly(true)
+            .remount()
+            .expect("Failed to remount runtime directory");
     }
 }
 

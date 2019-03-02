@@ -58,6 +58,7 @@ fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
         if compile_success {
             debug!("Compile success");
 
+            work_dir.remount_runtime_dir();
             if work_dir.problem_dir().spj_path().exists() {
                 assert!(
                     build_special_judge(work_dir.clone()).expect("Failed to build special judge"),
@@ -148,7 +149,7 @@ fn generate_report_from_work_dir(
 fn generate_compile_future(work_dir: workspace::WorkSpace) -> impl Future<Item = bool, Error = ()> {
     let language = work_dir.source_dir().get_language();
     let source_file = work_dir.source_dir().source_file();
-    let executable_file = work_dir.source_dir().executable_file();
+    let executable_file = work_dir.runtime_dir().executable_file();
     compiler::compile(&language, &source_file, &executable_file)
 }
 
@@ -162,14 +163,14 @@ fn generate_launch_future(
 
     for test_case in work_dir.problem_dir().test_cases() {
         let id = id.clone();
-        let executable_file = work_dir.source_dir().executable_file();
+        let runtime_dir = work_dir.runtime_dir();
         let input_file = test_case.input_file();
         let output_file = test_case.output_file();
 
         let task = future::lazy(move || {
             runner::launch(
                 &id,
-                &executable_file,
+                &runtime_dir,
                 &input_file,
                 &output_file,
                 time_limit,

@@ -22,48 +22,54 @@ pub struct LaunchResult {
 
 pub fn launch(
     name: &str,
-    executable_file: &path::Path,
+    chroot_dir: &path::Path,
     input_file: &path::Path,
     output_file: &path::Path,
     time_limit: u64,
     memory_limit: u64,
 ) -> impl Future<Item = LaunchResult, Error = ()> {
     let cg = cgroup::Cgroup::new(&name, time_limit, memory_limit);
-    let mut child = unshare::Command::new(&executable_file);
-    let cgroup_hook = {
+    let mut child = unshare::Command::new("/main");
+    let child_hook = {
         let cpu_procs = cg.cpu_cgroup_path().join("cgroup.procs");
         let memory_procs = cg.memory_cgroup_path().join("cgroup.procs");
         move |pid: u32| {
-            fs::write(&cpu_procs, format!("{}", pid)).unwrap();
-            fs::write(&memory_procs, format!("{}", pid)).unwrap();
+            fs::write(&cpu_procs, format!("{}", pid))
+                .expect("Failed to write to time cgroup processes");
+            fs::write(&memory_procs, format!("{}", pid))
+                .expect("Failed to write to memory cgroup processes");
+            thread::spawn(move || {
+                thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 5));
+                let _res = nix::sys::signal::kill(
+                    nix::unistd::Pid::from_raw(pid as i32),
+                    Some(nix::sys::signal::SIGKILL),
+                );
+            });
+            Ok(())
         }
     };
-    child.before_unfreeze(move |pid| {
-        cgroup_hook(pid);
-        thread::spawn(move || {
-            use nix::{sys::signal, unistd::Pid};
-            thread::sleep(time::Duration::from_nanos(time_limit + time_limit / 5));
-            let _res = signal::kill(Pid::from_raw(pid as i32), Some(signal::SIGKILL));
-        });
-        Ok(())
-    });
+    child.before_unfreeze(child_hook);
     child
         .env_clear()
+        .arg0("main")
+        // .uid(65534)
+        // .gid(65534)
         .unshare(&[
             unshare::Namespace::Cgroup,
+            unshare::Namespace::Ipc,
+            unshare::Namespace::Mount,
             unshare::Namespace::Net,
             unshare::Namespace::Pid,
             unshare::Namespace::User,
-            unshare::Namespace::Ipc,
+            unshare::Namespace::Uts,
         ])
-        // .uid(65534)
-        // .gid(65534)
-        .arg0("main")
+        .current_dir("/")
+        .chroot_dir(chroot_dir)
         .stdin(unshare::Stdio::from_file(
-            fs::File::open(&input_file).expect("Failed to open input file"),
+            fs::File::open(input_file).unwrap(),
         ))
         .stdout(unshare::Stdio::from_file(
-            fs::File::create(&output_file).expect("Failed to create output file"),
+            fs::File::create(output_file).unwrap(),
         ));
     LaunchFuture {
         cg,
@@ -84,7 +90,9 @@ impl Future for LaunchFuture {
     type Item = LaunchResult;
     type Error = ();
     fn poll(&mut self) -> Poll<LaunchResult, ()> {
-        match tokio_threadpool::blocking(|| self.child.status().unwrap()) {
+        match tokio_threadpool::blocking(|| {
+            self.child.status().expect("Failed to spawn child process")
+        }) {
             Ok(Async::Ready(status)) => {
                 let res = LaunchResult {
                     exit_code: status.code().unwrap_or(-1),
