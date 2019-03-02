@@ -61,7 +61,7 @@ impl Cgroup {
 }
 
 impl Cgroup {
-    pub fn new(name: &str, cpu_time_limit: u64, memory_usage_limit: u64) -> Cgroup {
+    pub fn new(cpu_time_limit: u64, memory_usage_limit: u64) -> Cgroup {
         INIT_ANA_CGROUP.call_once(|| {
             debug!(
                 "Ana cgroup is created in {} and {}",
@@ -70,6 +70,7 @@ impl Cgroup {
             fs::create_dir_all(CPU_CGROUP_PATH).expect("Failed to create cpu cgroup");
             fs::create_dir_all(MEMORY_CGROUP_PATH).expect("Failed to create memory cgroup");
         });
+        let name = uuid::Uuid::new_v4();
         let ret = Cgroup {
             name: name.to_string(),
             cpu_time_limit,

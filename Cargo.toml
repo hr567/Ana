@@ -21,11 +21,11 @@ tempfile = "3.*"
 tokio = "0.1"
 tokio-threadpool = "0.1"
 unshare = "0.5"
+uuid = { version = "0.7", features = ["v4"] }
 zmq = { version = "0.9", optional = true }
 
 [dev-dependencies]
 env_logger = "0.6.0"
-uuid = { version = "0.7", features = ["v4"] }
 
 [features]
 default = ["gcc", "gxx", "zmq_mod"]

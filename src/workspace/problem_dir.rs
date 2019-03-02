@@ -73,14 +73,21 @@ pub trait ProblemDir {
         spj_path.init_source_dir(spj);
     }
 
+    fn get_test_case_path(&self, index: usize) -> Option<Box<Path>> {
+        let res = self.path().join(index.to_string());
+        if res.exists() {
+            Some(res.into_boxed_path())
+        } else {
+            None
+        }
+    }
+
     fn test_cases(&self) -> Vec<Box<Path>> {
         let mut res = Vec::new();
-        for index in 0.. {
-            let test_case_path = self.path().join(index.to_string());
-            if test_case_path.exists() {
-                res.push(test_case_path.into_boxed_path());
-            } else {
-                break;
+        for i in 0.. {
+            match self.get_test_case_path(i) {
+                Some(test_case) => res.push(test_case),
+                None => break,
             }
         }
         res

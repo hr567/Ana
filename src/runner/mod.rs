@@ -21,14 +21,13 @@ pub struct LaunchResult {
 }
 
 pub fn launch(
-    name: &str,
     chroot_dir: &path::Path,
     input_file: &path::Path,
     output_file: &path::Path,
     time_limit: u64,
     memory_limit: u64,
 ) -> impl Future<Item = LaunchResult, Error = ()> {
-    let cg = cgroup::Cgroup::new(&name, time_limit, memory_limit);
+    let cg = cgroup::Cgroup::new(time_limit, memory_limit);
     let mut child = unshare::Command::new("/main");
     let child_hook = {
         let cpu_procs = cg.cpu_cgroup_path().join("cgroup.procs");
