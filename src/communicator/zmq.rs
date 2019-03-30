@@ -41,7 +41,7 @@ mod tests {
     use std::io;
     use std::path;
 
-    use uuid::prelude::*;
+    use uuid::Uuid;
 
     fn generate_judge_task<T: AsRef<path::Path>>(
         source_file: T,
