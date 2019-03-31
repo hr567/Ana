@@ -14,9 +14,6 @@ mod workspace;
 use communicator::*;
 use workspace::*;
 
-const NS_PER_SEC: f64 = 1_000_000_000 as f64;
-const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
-
 /// The entry of judging
 /// Generate reports for every task from receiver and then send them
 pub fn start_judging<T, U>(
@@ -89,8 +86,8 @@ fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
                 &work_dir.get_id(),
                 0,
                 mtp::JudgeResult::CE,
-                0.0,
-                0.0,
+                0,
+                0,
             )])
         }
     })
@@ -147,13 +144,7 @@ fn generate_report(
     } else {
         mtp::JudgeResult::WA
     };
-    mtp::JudgeReport::new(
-        &id,
-        index,
-        status,
-        cpu_time_usage as f64 / NS_PER_SEC,
-        memory_usage as f64 / BYTES_PER_MB,
-    )
+    mtp::JudgeReport::new(&id, index, status, cpu_time_usage, memory_usage)
 }
 
 fn generate_compile_future(work_dir: WorkSpace) -> impl Future<Item = bool, Error = ()> {
@@ -208,8 +199,11 @@ mod tests_common {
     use uuid::prelude::*;
     use zmq;
 
-    pub const TIME_EPS: f64 = 1.0;
-    pub const MEMORY_EPS: f64 = 1.0;
+    pub const NS_PER_SEC: f64 = 1_000_000_000 as f64;
+    pub const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
+
+    pub const TIME_EPS: f64 = 2.0;
+    pub const MEMORY_EPS: f64 = 1.1;
 
     pub struct Judge {
         judge_sender: zmq::Socket,
@@ -287,12 +281,12 @@ mod tests_common {
         report: &mtp::JudgeReport,
         id: &str,
         status: &str,
-        time: f64,
-        memory: f64,
+        time: u64,
+        memory: u64,
     ) {
         assert_eq!(report.id, id);
         assert_eq!(report.status, status);
-        assert!(report.time <= time * 2.0);
+        assert!(report.time <= time);
         assert!(report.memory <= memory);
     }
 }
@@ -311,7 +305,13 @@ mod test_normal_judge {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "AC", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "AC",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -321,7 +321,13 @@ mod test_normal_judge {
         let judge = Judge::new("test_normal_judge_with_ce");
         judge.send_judge(&judge_task);
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_task.id, "CE", 1.0, 32.0);
+        assert_report_with_limit(
+            &report.into(),
+            &judge_task.id,
+            "CE",
+            (1.0 * NS_PER_SEC) as u64,
+            (32.0 * BYTES_PER_MB) as u64,
+        );
     }
 
     #[test]
@@ -335,8 +341,8 @@ mod test_normal_judge {
                 &report.into(),
                 &judge_task.id,
                 "MLE",
-                1.0,
-                32.0 + MEMORY_EPS,
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * MEMORY_EPS * BYTES_PER_MB) as u64,
             );
         }
     }
@@ -348,7 +354,13 @@ mod test_normal_judge {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "RE", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "RE",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -359,7 +371,13 @@ mod test_normal_judge {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "TLE", 1.0 + TIME_EPS, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "TLE",
+                (1.0 * TIME_EPS * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -370,7 +388,13 @@ mod test_normal_judge {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "WA", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "WA",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 }
@@ -389,7 +413,13 @@ mod test_spj_0 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "AC", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "AC",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -399,7 +429,13 @@ mod test_spj_0 {
         let judge = Judge::new("test_special_judge_0_with_ce");
         judge.send_judge(&judge_task);
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_task.id, "CE", 1.0, 32.0);
+        assert_report_with_limit(
+            &report.into(),
+            &judge_task.id,
+            "CE",
+            (1.0 * NS_PER_SEC) as u64,
+            (32.0 * BYTES_PER_MB) as u64,
+        );
     }
 
     #[test]
@@ -413,8 +449,8 @@ mod test_spj_0 {
                 &report.into(),
                 &judge_task.id,
                 "MLE",
-                1.0,
-                32.0 + MEMORY_EPS,
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * MEMORY_EPS * BYTES_PER_MB) as u64,
             );
         }
     }
@@ -426,7 +462,13 @@ mod test_spj_0 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "RE", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "RE",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -437,7 +479,13 @@ mod test_spj_0 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "TLE", 1.0 + TIME_EPS, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "TLE",
+                (1.0 * TIME_EPS * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -448,7 +496,13 @@ mod test_spj_0 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "WA", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "WA",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -468,7 +522,13 @@ mod test_spj_1 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "AC", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "AC",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -478,7 +538,13 @@ mod test_spj_1 {
         let judge = Judge::new("test_special_judge_1_with_ce");
         judge.send_judge(&judge_task);
         let report = judge.receive_report();
-        assert_report_with_limit(&report.into(), &judge_task.id, "CE", 1.0, 32.0);
+        assert_report_with_limit(
+            &report.into(),
+            &judge_task.id,
+            "CE",
+            (1.0 * NS_PER_SEC) as u64,
+            (32.0 * BYTES_PER_MB) as u64,
+        );
     }
 
     #[test]
@@ -492,8 +558,8 @@ mod test_spj_1 {
                 &report.into(),
                 &judge_task.id,
                 "MLE",
-                1.0,
-                32.0 + MEMORY_EPS,
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * MEMORY_EPS * BYTES_PER_MB) as u64,
             );
         }
     }
@@ -505,7 +571,13 @@ mod test_spj_1 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "RE", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "RE",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -516,7 +588,13 @@ mod test_spj_1 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "TLE", 1.0 + TIME_EPS, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "TLE",
+                (1.0 * TIME_EPS * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 
@@ -527,7 +605,13 @@ mod test_spj_1 {
         judge.send_judge(&judge_task);
         for _i in 0..judge_task.problem.len() {
             let report = judge.receive_report();
-            assert_report_with_limit(&report.into(), &judge_task.id, "WA", 1.0, 32.0);
+            assert_report_with_limit(
+                &report.into(),
+                &judge_task.id,
+                "WA",
+                (1.0 * NS_PER_SEC) as u64,
+                (32.0 * BYTES_PER_MB) as u64,
+            );
         }
     }
 }

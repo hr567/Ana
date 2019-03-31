@@ -4,9 +4,6 @@ use std::path::Path;
 use super::SourceDir;
 use crate::mtp;
 
-const NS_PER_SEC: f64 = 1_000_000_000 as f64;
-const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
-
 pub trait ProblemDir {
     fn path(&self) -> Box<Path>;
 
@@ -45,17 +42,9 @@ pub trait ProblemDir {
         }
     }
 
-    fn generate_limit(&self, time_limit: f64, memory_limit: f64) {
-        fs::write(
-            self.time_limit_file(),
-            format!("{}", (time_limit * NS_PER_SEC) as u64),
-        )
-        .unwrap();
-        fs::write(
-            self.memory_limit_file(),
-            format!("{}", (memory_limit * BYTES_PER_MB) as u64),
-        )
-        .unwrap();
+    fn generate_limit(&self, time_limit: u64, memory_limit: u64) {
+        fs::write(self.time_limit_file(), time_limit.to_string()).unwrap();
+        fs::write(self.memory_limit_file(), memory_limit.to_string()).unwrap();
     }
 
     fn generate_test_cases(&self, test_cases: Vec<mtp::TestCase>) {

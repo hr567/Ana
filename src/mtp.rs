@@ -6,13 +6,13 @@ use serde_derive::{Deserialize, Serialize};
 #[serde(tag = "type")]
 pub enum Problem {
     Normal {
-        time_limit: f64,
-        memory_limit: f64,
+        time_limit: u64,   // NS
+        memory_limit: u64, // Bytes
         test_cases: Vec<TestCase>,
     },
     Special {
-        time_limit: f64,
-        memory_limit: f64,
+        time_limit: u64,   // NS
+        memory_limit: u64, // Bytes
         test_cases: Vec<TestCase>,
         spj: Source,
     },
@@ -52,12 +52,12 @@ pub struct JudgeReport {
     pub id: String,
     pub index: usize,
     pub status: String,
-    pub time: f64,
-    pub memory: f64,
+    pub time: u64,   // NS
+    pub memory: u64, // Bytes
 }
 
 impl JudgeReport {
-    pub fn new(id: &str, index: usize, status: JudgeResult, time: f64, memory: f64) -> JudgeReport {
+    pub fn new(id: &str, index: usize, status: JudgeResult, time: u64, memory: u64) -> JudgeReport {
         JudgeReport {
             id: id.to_string(),
             index,

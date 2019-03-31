@@ -1,7 +1,7 @@
 {
     "type": "Normal",
-    "time_limit": 1.0,
-    "memory_limit": 32.0,
+    "time_limit": 1000000000,
+    "memory_limit": 33554432,
     "test_cases": [
         {
             "input": "1 1",

@@ -43,6 +43,9 @@ mod tests {
 
     use uuid::Uuid;
 
+    const NS_PER_SEC: f64 = 1_000_000_000 as f64;
+    const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
+
     fn generate_judge_task<T: AsRef<path::Path>>(
         source_file: T,
         problem_file: T,
@@ -87,8 +90,13 @@ mod tests {
 
     #[test]
     fn test_report_sender() -> io::Result<()> {
-        let report_info =
-            mtp::JudgeReport::new("test_report_sender", 0, mtp::JudgeResult::AC, 0.8, 13.6);
+        let report_info = mtp::JudgeReport::new(
+            "test_report_sender",
+            0,
+            mtp::JudgeResult::AC,
+            (0.8 * NS_PER_SEC) as u64,
+            (13.6 * BYTES_PER_MB) as u64,
+        );
 
         let context = zmq::Context::new();
         let sender = {

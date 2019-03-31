@@ -1,7 +1,7 @@
 {
     "type": "Special",
-    "time_limit": 1.0,
-    "memory_limit": 32.0,
+    "time_limit": 1000000000,
+    "memory_limit": 33554432,
     "spj": {
         "language": "cpp.gxx",
         "code": "#include <cstdio>\n#define AC 0\n#define WA 1\nusing namespace std;\nint main(int argc, char *args[]) {\n  FILE *f_in = fopen(args[1], \"r\");\n  FILE *f_out = fopen(args[2], \"r\");\n  FILE *f_user = fopen(args[3], \"r\");\n  int a, b;\n  while (fscanf(f_in, \"%d%d\", &a, &b) != EOF) {\n    int ans;\n    if (fscanf(f_user, \"%d\", &ans) == EOF || ans != a + b) {\n      return WA;\n    }\n  }\n  return AC;\n}\n"

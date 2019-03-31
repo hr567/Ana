@@ -52,8 +52,8 @@ A message is a json string and defined as following examples:
     },
     "problem": {
       "problem_type": "normal",
-      "time_limit": 1.0,
-      "memory_limit": 32.0,
+      "time_limit": 1000000000,
+      "memory_limit": 33554432,
       "checker": {
         "language": "",
         "code": ""
@@ -87,8 +87,8 @@ A message is a json string and defined as following examples:
     },
     "problem": {
       "problem_type": "spj",
-      "time_limit": 1.0,
-      "memory_limit": 32.0,
+      "time_limit": 1000000000,
+      "memory_limit": 33554432,
       "checker": {
         "language": "cpp.gxx",
         "code": "..."
@@ -117,8 +117,8 @@ A message is a json string and defined as following examples:
     "id": "b6555832ef2111e8bc847470fd3b4381",
     "case_index": 0,
     "status": "AC",
-    "time": 0.8,
-    "memory": 1.2
+    "time": 800000000,
+    "memory": 1258291
   }
   ```
 
