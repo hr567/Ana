@@ -1,5 +1,8 @@
 use super::*;
 
+use std::fs;
+use std::io;
+
 #[cfg(feature = "gcc")]
 mod c_gcc;
 #[cfg(feature = "gxx")]
@@ -42,12 +45,8 @@ mod tests {
         fs::write(&source_file, "#include<stdio.h>\nint main() { return 0; }")
             .expect("Failed to write source code");
         let compiler = get_compiler("c.gcc").unwrap();
-        let pool = tokio_threadpool::ThreadPool::new();
-        let compile_result = pool
-            .spawn_handle(compiler.compile(&source_file, &executable_file))
-            .wait()
-            .unwrap();
-        assert!(compile_result);
+        let compile_success = compiler.compile(&source_file, &executable_file);
+        assert!(compile_success);
         assert!(process::Command::new(&executable_file).status()?.success());
         Ok(())
     }
@@ -61,12 +60,8 @@ mod tests {
         fs::write(&source_file, "#include<iostream>\nint main() { return 0; }")
             .expect("Failed to write source code");
         let compiler = get_compiler("cpp.gxx").unwrap();
-        let pool = tokio_threadpool::ThreadPool::new();
-        let compile_result = pool
-            .spawn_handle(compiler.compile(&source_file, &executable_file))
-            .wait()
-            .unwrap();
-        assert!(compile_result);
+        let compile_success = compiler.compile(&source_file, &executable_file);
+        assert!(compile_success);
         assert!(process::Command::new(&executable_file).status()?.success());
         Ok(())
     }

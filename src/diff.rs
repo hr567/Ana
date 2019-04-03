@@ -20,24 +20,25 @@ fn diff(output: &[u8], answer: &[u8]) -> bool {
         .all(|(output, answer)| output.trim_end_matches(' ') == answer.trim_end_matches(' '))
 }
 
-pub fn check(
+pub fn check(output_file: &path::Path, answer_file: &path::Path) -> io::Result<bool> {
+    Ok(!diff(
+        fs::read(&output_file)?.as_slice(),
+        fs::read(&answer_file)?.as_slice(),
+    ))
+}
+
+pub fn check_with_spj(
     input_file: &path::Path,
     output_file: &path::Path,
     answer_file: &path::Path,
-    spj: Option<&path::Path>,
+    spj: &path::Path,
 ) -> io::Result<bool> {
-    match spj {
-        Some(spj) => Ok(process::Command::new(spj)
-            .arg(input_file)
-            .arg(answer_file)
-            .arg(output_file)
-            .status()?
-            .success()),
-        None => Ok(!diff(
-            fs::read(&output_file)?.as_slice(),
-            fs::read(&answer_file)?.as_slice(),
-        )),
-    }
+    Ok(process::Command::new(spj)
+        .arg(input_file)
+        .arg(answer_file)
+        .arg(output_file)
+        .status()?
+        .success())
 }
 
 #[cfg(test)]
@@ -76,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_without_spj() -> io::Result<()> {
+    fn test_check() -> io::Result<()> {
         let work_dir = tempfile::tempdir()?;
         let file0 = work_dir.path().join("test_check_without_spj.0");
         let file1 = work_dir.path().join("test_check_without_spj.1");
@@ -84,11 +85,8 @@ mod tests {
         fs::write(&file0, "hello world")?;
         fs::write(&file1, "hello world")?;
         fs::write(&file2, "hello_world")?;
-        assert!(check(&file0, &file0, &file1, None)?);
-        assert!(!check(&file0, &file0, &file2, None)?);
-        fs::remove_file(&file0)?;
-        fs::remove_file(&file1)?;
-        fs::remove_file(&file2)?;
+        assert!(check(&file0, &file1)?);
+        assert!(!check(&file0, &file2)?);
         Ok(())
     }
 

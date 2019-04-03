@@ -19,7 +19,7 @@ Please note that testing Ana needs root permission
 to read and write to cgroups.
 
 If you find that the time usage is less than time limit
-but the status is TLE, try again with less `max_threads`.
+but the status is TLE, try again with less `judge_threads`.
 
 You can use `cargo test -- --test-threads=1`
 on some computers to avoid some testing mistake.
@@ -35,7 +35,8 @@ Run `cargo run -- --help` for more information.
 Ana uses ZeroMQ to communicate with online judge server.
 
 It uses a PULL and a PUSH to receive and send message.
-A message is a json string and defined as following examples:
+The unit of time is ns and the unit of memory is byte.
+A message is a json string and defined as following examples.
 
 * Judge
 
@@ -126,10 +127,7 @@ A message is a json string and defined as following examples:
 ## Workspace
 ```
 workspace
-├── id                // Judge ID
 ├── problem
-│   ├── time_limit    // time limit in ns
-│   ├── memory_limit  // memory limit in byte
 │   ├── 0
 │   │   ├── answer    // file contains answer
 │   │   ├── input     // file contains input
@@ -139,15 +137,13 @@ workspace
 │   ├── 2
 │   │   └── ..        // same as 0
 │   ├── ..            // more test cases
-│   └── spj           // same as source if spj is available
+│   └── spj           // same as source (if spj is available)
 │       ├── spj
 │       ├── lang
 │       └── source
 ├── runtime           // chroot directory (empty)
 |   └── main          // executable file
-└── source            // directory for source code and compiled program
-    ├── lang          // language of the code
-    └── source        // source code
+└── source            // source code
 ```
 
 

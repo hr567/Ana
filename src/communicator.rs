@@ -6,16 +6,19 @@ use tokio::prelude::*;
 #[cfg(feature = "zmq_mod")]
 mod zmq;
 
+pub const EOF: &str = "EOF";
+
 #[derive(PartialEq, Debug)]
 pub enum Error {
     Network,
     Data,
+    EOF,
 }
 
 /// The `Receiver` trait allows for receiving judge task
 pub trait Receiver {
     /// Receive a JudgeTask
-    ///
+
     /// This method should block current thread until
     /// it receive a judge task and then return it.
     fn receive(&self) -> Result<mtp::JudgeTask, Error>;
@@ -47,8 +50,9 @@ impl<T: Receiver> Stream for TaskReceiver<T> {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match tokio_threadpool::blocking(|| self.receive()) {
             Ok(Async::Ready(Ok(res))) => Ok(Async::Ready(Some(res))),
-            Ok(Async::Ready(Err(Error::Data))) => Ok(Async::Ready(None)),
+            Ok(Async::Ready(Err(Error::Data))) => Err(()),
             Ok(Async::Ready(Err(Error::Network))) => Err(()),
+            Ok(Async::Ready(Err(Error::EOF))) => Ok(Async::Ready(None)),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(_) => Err(()),
         }

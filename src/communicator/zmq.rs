@@ -2,15 +2,19 @@ use crate::mtp;
 use serde_json;
 use zmq;
 
-use super::{Error, Receiver, Sender};
+use super::{Error, Receiver, Sender, EOF};
 
 impl Receiver for zmq::Socket {
     /// Receive a judge task from zmq socket.
     ///
     /// Return Err(Network) if the socket cannot receive any data from network.
     /// Return Err(Data) if received message cannot be deserialized.
+    /// Return Err(Eof) if received message is EOF
     fn receive(&self) -> Result<mtp::JudgeTask, Error> {
         if let Ok(buf) = self.recv_bytes(0) {
+            if buf == EOF.as_bytes() {
+                return Err(Error::EOF);
+            }
             match serde_json::from_slice(&buf) {
                 Ok(res) => Ok(res),
                 Err(_) => Err(Error::Data),

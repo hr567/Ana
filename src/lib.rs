@@ -1,4 +1,4 @@
-use std::sync;
+use std::path;
 use std::time;
 
 use log::*;
@@ -16,9 +16,9 @@ use workspace::*;
 
 /// The entry of judging
 /// Generate reports for every task from receiver and then send them
+/// Should be called only once
 pub fn start_judging<T, U>(
-    _max_compile_threads: usize,
-    _max_judge_threads: usize,
+    judge_threads: usize,
     judge_receiver: impl Into<TaskReceiver<T>>,
     report_sender: impl Into<ReportSender<U>>,
 ) where
@@ -27,10 +27,16 @@ pub fn start_judging<T, U>(
 {
     let judge_receiver = judge_receiver.into();
     let report_sender = report_sender.into();
+
+    let pool = tokio_threadpool::Builder::new()
+        .pool_size(judge_threads)
+        .build();
+
     let server = judge_receiver.for_each(move |judge_task| {
-        debug!("Received judge information: {:?}", &judge_task);
         let report_sender = report_sender.clone();
-        let task = judge(judge_task).and_then(move |reports| {
+        pool.spawn(future::lazy(move || {
+            debug!("Received judge information: {:?}", &judge_task);
+            let reports = judge(judge_task);
             debug!("Generated judge reports: {:?}", &reports);
             for report in reports {
                 report_sender
@@ -38,59 +44,130 @@ pub fn start_judging<T, U>(
                     .unwrap_or_else(|_| error!("Failed to send report"));
             }
             Ok(())
-        });
-        tokio::spawn(task);
+        }));
         Ok(())
     });
+
     tokio::run(server);
 }
 
 /// Judge the task and generate a list of reports
-fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>, Error = ()> {
+fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
     debug!("Start judging task :{}", &judge_task.id);
-    let work_dir = WorkSpace::new(judge_task);
-    generate_compile_future(work_dir.clone()).and_then(move |compile_success| {
-        if compile_success {
-            work_dir.remount_runtime_dir();
-            if work_dir.problem_dir().spj_path().exists() {
-                assert!(
-                    build_special_judge(work_dir.clone()).expect("Failed to build special judge"),
-                    "Failed to build special judge"
-                );
+
+    let work_dir = WorkSpace::new();
+    work_dir.prepare_judge_task(&judge_task);
+
+    let mtp::JudgeTask {
+        id,
+        source,
+        problem,
+    } = judge_task;
+
+    let compile_success = {
+        let mtp::Source {
+            language: source_language,
+            ..
+        } = source;
+        compiler::compile(
+            &source_language,
+            &work_dir.source_file(),
+            &work_dir.runtime_dir().executable_file(),
+        )
+    };
+
+    match problem {
+        mtp::Problem::Normal {
+            time_limit,
+            memory_limit,
+            ..
+        } => {
+            if !compile_success {
+                let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
+                return vec![ce_report];
             }
 
-            let (report_sender, report_receiver) = sync::mpsc::channel();
-            for (index, task) in generate_launch_future(work_dir.clone())
-                .into_iter()
-                .enumerate()
+            let mut reports = Vec::new();
+
+            for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
             {
                 debug!("Testing test case #{}", index);
-                // Clone these values for the move lambda
-                let report_sender = report_sender.clone();
-                let work_dir = work_dir.clone();
-
-                let task = task.and_then(move |launch_result| {
-                    let report = generate_report(work_dir, index, launch_result);
-                    debug!("[#{}] Generated report: {:?}", index, &report);
-                    report_sender.send(report).unwrap();
-                    Ok(())
-                });
-                tokio::spawn(task);
+                let launch_result = runner::launch(
+                    &work_dir.runtime_dir(),
+                    &test_case_dir.input_file(),
+                    &test_case_dir.output_file(),
+                    time_limit,
+                    memory_limit,
+                )
+                .wait()
+                .expect("Failed to run compiled program");
+                let report = generate_normal_problem_report(
+                    &id,
+                    time_limit,
+                    memory_limit,
+                    &work_dir.problem_dir(),
+                    index,
+                    launch_result,
+                );
+                debug!("[#{}] Generated report: {:?}", index, &report);
+                reports.push(report);
             }
-            drop(report_sender);
-            let reports: Vec<mtp::JudgeReport> = report_receiver.iter().collect();
-            debug!("Collected reports: {:?}", &reports);
-            Ok(reports)
-        } else {
-            Ok(vec![mtp::JudgeReport::new(
-                &work_dir.get_id(),
-                0,
-                mtp::JudgeResult::CE,
-                0,
-                0,
-            )])
+
+            reports
         }
-    })
+        mtp::Problem::Special {
+            time_limit,
+            memory_limit,
+            spj,
+            ..
+        } => {
+            if !compile_success {
+                let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
+                return vec![ce_report];
+            }
+
+            let spj_compile_success = {
+                let mtp::Source {
+                    language: spj_source_language,
+                    ..
+                } = spj;
+                compiler::compile(
+                    &spj_source_language,
+                    &work_dir.problem_dir().spj_source(),
+                    &work_dir.problem_dir().spj_file(),
+                )
+            };
+            assert!(spj_compile_success, "Failed to compile spj");
+
+            let mut reports = Vec::new();
+
+            for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
+            {
+                debug!("Testing test case #{}", index);
+                let launch_result = runner::launch(
+                    &work_dir.runtime_dir(),
+                    &test_case_dir.input_file(),
+                    &test_case_dir.output_file(),
+                    time_limit,
+                    memory_limit,
+                )
+                .wait()
+                .expect("Failed to run compiled program");
+                let report = generate_special_judge_problem_report(
+                    &id,
+                    time_limit,
+                    memory_limit,
+                    &work_dir.problem_dir(),
+                    index,
+                    launch_result,
+                );
+                debug!("[#{}] Generated report: {:?}", index, &report);
+                reports.push(report);
+            }
+
+            reports
+        }
+    }
 }
 
 /// Generate the judge report using given data.
@@ -100,19 +177,17 @@ fn judge(judge_task: mtp::JudgeTask) -> impl Future<Item = Vec<mtp::JudgeReport>
 /// If the cpu time usage being much smaller than
 /// real time usage means that there are too many
 /// threads working in one time or the program use sleep.
-fn generate_report(
-    work_dir: WorkSpace,
-    index: usize,
+fn generate_normal_problem_report(
+    id: &str,
+    time_limit: u64,
+    memory_limit: u64,
+    problem_dir: &path::Path,
+    test_case_index: usize,
     launch_result: runner::LaunchResult,
 ) -> mtp::JudgeReport {
-    let id = work_dir.get_id();
-    let time_limit = work_dir.problem_dir().time_limit();
-    let memory_limit = work_dir.problem_dir().memory_limit();
-    let case_dir = work_dir.problem_dir().get_test_case_path(index).unwrap();
-    let input_file = case_dir.input_file();
+    let case_dir = &problem_dir.test_case_dirs()[test_case_index];
     let output_file = case_dir.output_file();
     let answer_file = case_dir.answer_file();
-    let spj_file = work_dir.problem_dir().spj_path().executable_file();
 
     let runner::LaunchResult {
         exit_code,
@@ -128,63 +203,50 @@ fn generate_report(
         mtp::JudgeResult::TLE
     } else if exit_code != 0 {
         mtp::JudgeResult::RE
-    } else if diff::check(
-        &input_file,
-        &output_file,
-        &answer_file,
-        if spj_file.exists() {
-            Some(spj_file.as_ref())
-        } else {
-            None
-        },
-    )
-    .unwrap_or(false)
+    } else if diff::check(&output_file, &answer_file).unwrap_or(false) {
+        mtp::JudgeResult::AC
+    } else {
+        mtp::JudgeResult::WA
+    };
+    mtp::JudgeReport::new(&id, test_case_index, status, cpu_time_usage, memory_usage)
+}
+
+fn generate_special_judge_problem_report(
+    id: &str,
+    time_limit: u64,
+    memory_limit: u64,
+    problem_dir: &path::Path,
+    test_case_index: usize,
+    launch_result: runner::LaunchResult,
+) -> mtp::JudgeReport {
+    let case_dir = &problem_dir.test_case_dirs()[test_case_index];
+    let input_file = case_dir.input_file();
+    let output_file = case_dir.output_file();
+    let answer_file = case_dir.answer_file();
+    let spj_file = problem_dir.spj_file();
+
+    let runner::LaunchResult {
+        exit_code,
+        real_time_usage,
+        cpu_time_usage,
+        memory_usage,
+        tle_flag,
+        mle_flag,
+    } = launch_result;
+    let status = if mle_flag || memory_usage >= memory_limit {
+        mtp::JudgeResult::MLE
+    } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit / 2 * 3) {
+        mtp::JudgeResult::TLE
+    } else if exit_code != 0 {
+        mtp::JudgeResult::RE
+    } else if diff::check_with_spj(&input_file, &output_file, &answer_file, &spj_file)
+        .unwrap_or(false)
     {
         mtp::JudgeResult::AC
     } else {
         mtp::JudgeResult::WA
     };
-    mtp::JudgeReport::new(&id, index, status, cpu_time_usage, memory_usage)
-}
-
-fn generate_compile_future(work_dir: WorkSpace) -> impl Future<Item = bool, Error = ()> {
-    let language = work_dir.source_dir().get_language();
-    let source_file = work_dir.source_dir().source_file();
-    let executable_file = work_dir.runtime_dir().executable_file();
-    compiler::compile(&language, &source_file, &executable_file)
-}
-
-fn generate_launch_future(
-    work_dir: WorkSpace,
-) -> Vec<impl Future<Item = runner::LaunchResult, Error = ()>> {
-    let mut res = Vec::new();
-    let time_limit = work_dir.problem_dir().time_limit();
-    let memory_limit = work_dir.problem_dir().memory_limit();
-
-    for test_case in work_dir.problem_dir().test_cases() {
-        let runtime_dir = work_dir.runtime_dir();
-        let input_file = test_case.input_file();
-        let output_file = test_case.output_file();
-
-        let task = future::lazy(move || {
-            runner::launch(
-                &runtime_dir,
-                &input_file,
-                &output_file,
-                time_limit,
-                memory_limit,
-            )
-        });
-        res.push(task);
-    }
-    res
-}
-
-fn build_special_judge(work_dir: WorkSpace) -> Result<bool, ()> {
-    let language = work_dir.spj_path().get_language();
-    let spj_source_file = work_dir.spj_path().source_file();
-    let spj_executable_file = work_dir.spj_path().executable_file();
-    compiler::compile(&language, &spj_source_file, &spj_executable_file).wait()
+    mtp::JudgeReport::new(&id, test_case_index, status, cpu_time_usage, memory_usage)
 }
 
 #[cfg(test)]
@@ -193,11 +255,14 @@ mod tests_common {
 
     use std::fs;
     use std::path;
+    use std::sync;
     use std::thread;
 
     use serde_json;
     use uuid::prelude::*;
     use zmq;
+
+    use crate::communicator::EOF;
 
     pub const NS_PER_SEC: f64 = 1_000_000_000 as f64;
     pub const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
@@ -222,7 +287,7 @@ mod tests_common {
             let (report_sender, report_receiver) =
                 create_zmq_socket_pair(&format!("inproc://{}-report", &name));
             thread::spawn(move || {
-                start_judging(1, 1, judge_receiver, report_sender);
+                start_judging(1, judge_receiver, report_sender);
             });
             Judge {
                 judge_sender,
@@ -245,7 +310,7 @@ mod tests_common {
     impl Drop for Judge {
         fn drop(&mut self) {
             debug!("Dropping judge task");
-            self.judge_sender.send("EOF", 0).unwrap();
+            self.judge_sender.send(EOF, 0).unwrap();
         }
     }
 
