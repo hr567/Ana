@@ -1,4 +1,5 @@
 use std::path;
+use std::sync;
 use std::time;
 
 use log::*;
@@ -34,18 +35,17 @@ pub fn start_judging<T, U>(
         .build();
 
     let server = judge_receiver.for_each(move |judge_task| {
-        let report_sender = report_sender.clone();
+        debug!("Received judge information: {:?}", &judge_task);
+        let (tx, rx) = sync::mpsc::channel();
         pool.spawn(future::lazy(move || {
-            debug!("Received judge information: {:?}", &judge_task);
-            let reports = judge(judge_task);
-            debug!("Generated judge reports: {:?}", &reports);
-            for report in reports {
-                report_sender
-                    .send(report)
-                    .unwrap_or_else(|_| error!("Failed to send report"));
-            }
+            judge(judge_task, tx);
             Ok(())
         }));
+        for report in rx {
+            report_sender
+                .send(report)
+                .unwrap_or_else(|_| error!("Failed to send report"));
+        }
         Ok(())
     });
 
@@ -53,11 +53,13 @@ pub fn start_judging<T, U>(
 }
 
 /// Judge the task and generate a list of reports
-fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
-    debug!("Start judging task :{}", &judge_task.id);
+fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::JudgeReport>) {
+    debug!("[Start] Judge task :{}", &judge_task.id);
 
     let work_dir = WorkSpace::new();
     work_dir.prepare_judge_task(&judge_task);
+
+    debug!("Create work directory at {:?}", work_dir.as_ref());
 
     let mtp::JudgeTask {
         id,
@@ -65,6 +67,7 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
         problem,
     } = judge_task;
 
+    debug!("[Start] Compiling source code");
     let compile_success = {
         let mtp::Source {
             language: source_language,
@@ -76,6 +79,7 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
             &work_dir.runtime_dir().executable_file(),
         )
     };
+    debug!("[Done] Compiling source code");
 
     match problem {
         mtp::Problem::Normal {
@@ -85,10 +89,11 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
         } => {
             if !compile_success {
                 let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
-                return vec![ce_report];
+                report_sender
+                    .send(ce_report)
+                    .expect("Failed to send report");
+                return;
             }
-
-            let mut reports = Vec::new();
 
             for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
             {
@@ -111,10 +116,8 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
                     launch_result,
                 );
                 debug!("[#{}] Generated report: {:?}", index, &report);
-                reports.push(report);
+                report_sender.send(report).expect("Failed to send report");
             }
-
-            reports
         }
         mtp::Problem::Special {
             time_limit,
@@ -124,7 +127,10 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
         } => {
             if !compile_success {
                 let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
-                return vec![ce_report];
+                report_sender
+                    .send(ce_report)
+                    .expect("Failed to send report");
+                return;
             }
 
             let spj_compile_success = {
@@ -139,8 +145,6 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
                 )
             };
             assert!(spj_compile_success, "Failed to compile spj");
-
-            let mut reports = Vec::new();
 
             for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
             {
@@ -163,12 +167,11 @@ fn judge(judge_task: mtp::JudgeTask) -> Vec<mtp::JudgeReport> {
                     launch_result,
                 );
                 debug!("[#{}] Generated report: {:?}", index, &report);
-                reports.push(report);
+                report_sender.send(report).expect("Failed to send report");
             }
-
-            reports
         }
     }
+    debug!("[Done] Judge task");
 }
 
 /// Generate the judge report using given data.

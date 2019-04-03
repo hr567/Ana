@@ -6,7 +6,6 @@ use std::fs;
 use std::path;
 
 use libmount;
-use log::*;
 use tempfile;
 
 use crate::mtp;
@@ -25,8 +24,6 @@ impl WorkSpace {
             .mode(0o700)
             .mount()
             .expect("Failed to mount tmpfs on workspace");
-
-        debug!("Create new workspace in {:?}", &workspace.inner);
 
         workspace
     }
