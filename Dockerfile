@@ -5,7 +5,7 @@ RUN apt-get update && \
     pkg-config
 COPY . /Ana
 RUN cd /Ana && \
-    cargo build -v --release
+    cargo build -v
 
 FROM ubuntu:18.04
 RUN apt-get update && \
@@ -15,5 +15,7 @@ RUN apt-get update && \
     g++ && \
     apt-get clean
 COPY --from=build /Ana/target/release/ana /usr/local/bin
+ENV RUST_BACKTRACE=1
+ENV RUST_LOG=debug
 EXPOSE 8800 8801
 CMD [ "ana" ]
