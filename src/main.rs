@@ -42,7 +42,7 @@ fn get_arguments() -> (usize, String, String) {
         .get_matches();
 
     let judge_threads: usize = matches
-        .value_of("max_judge_threads")
+        .value_of("judge_threads")
         .unwrap()
         .parse()
         .expect("Please set environment or arguments current");

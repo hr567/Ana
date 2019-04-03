@@ -3,6 +3,7 @@ use std::time;
 
 use log::*;
 use tokio::prelude::*;
+use tokio_threadpool;
 
 mod communicator;
 mod compiler;
