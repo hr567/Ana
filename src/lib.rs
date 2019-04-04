@@ -36,16 +36,17 @@ pub fn start_judging<T, U>(
 
     let server = judge_receiver.for_each(move |judge_task| {
         debug!("Received judge information: {:?}", &judge_task);
-        let (tx, rx) = sync::mpsc::channel();
+        let report_sender = report_sender.clone();
         pool.spawn(future::lazy(move || {
+            let (tx, rx) = sync::mpsc::channel();
             judge(judge_task, tx);
+            for report in rx {
+                report_sender
+                    .send(report)
+                    .unwrap_or_else(|_| error!("Failed to send report"));
+            }
             Ok(())
         }));
-        for report in rx {
-            report_sender
-                .send(report)
-                .unwrap_or_else(|_| error!("Failed to send report"));
-        }
         Ok(())
     });
 

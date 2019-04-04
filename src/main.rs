@@ -1,4 +1,5 @@
 use clap::*;
+use env_logger;
 use log::*;
 use zmq;
 
@@ -57,6 +58,8 @@ fn get_arguments() -> (usize, String, String) {
 }
 
 fn main() {
+    env_logger::init();
+
     let (judge_threads, judge_receiver_endpoint, report_sender_endpoint) = get_arguments();
 
     let context = zmq::Context::new();
@@ -65,7 +68,7 @@ fn main() {
     judge_receiver
         .bind(&judge_receiver_endpoint)
         .unwrap_or_else(|_| panic!("Failed to bind to {}", &judge_receiver_endpoint));
-    debug!("Judge receiver bind on {}", &judge_receiver_endpoint);
+    debug!("Task receiver bind on {}", &judge_receiver_endpoint);
 
     let report_sender = context.socket(zmq::PUSH).unwrap();
     report_sender
