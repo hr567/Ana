@@ -1,5 +1,6 @@
 use std::path;
 use std::sync;
+use std::thread;
 use std::time;
 
 use log::*;
@@ -34,21 +35,31 @@ pub fn start_judging<T, U>(
         .pool_size(judge_threads)
         .build();
 
-    let server = judge_receiver.for_each(move |judge_task| {
-        debug!("Received judge information: {:?}", &judge_task);
-        let report_sender = report_sender.clone();
-        pool.spawn(future::lazy(move || {
-            let (tx, rx) = sync::mpsc::channel();
-            judge(judge_task, tx);
-            for report in rx {
-                report_sender
-                    .send(report)
-                    .unwrap_or_else(|_| error!("Failed to send report"));
-            }
-            Ok(())
-        }));
-        Ok(())
+    let (tx, rx) = sync::mpsc::channel();
+
+    thread::spawn(move || {
+        for report in rx {
+            report_sender
+                .send(report)
+                .unwrap_or_else(|_| error!("Failed to send report"));
+        }
     });
+
+    let server = judge_receiver
+        .map_err(|e| match e {
+            communicator::Error::Network => panic!("Network error"),
+            communicator::Error::Data => panic!("Data error"),
+            communicator::Error::EOF => unimplemented!("EOF should not appear here"),
+        })
+        .for_each(move |judge_task| {
+            debug!("Received judge information: {:?}", &judge_task);
+            let tx = tx.clone();
+            pool.spawn(future::lazy(move || {
+                judge(judge_task, tx);
+                Ok(())
+            }));
+            Ok(())
+        });
 
     tokio::run(server);
 }

@@ -46,15 +46,15 @@ impl<T: Receiver> From<T> for TaskReceiver<T> {
 
 impl<T: Receiver> Stream for TaskReceiver<T> {
     type Item = mtp::JudgeTask;
-    type Error = ();
+    type Error = Error;
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match tokio_threadpool::blocking(|| self.receive()) {
             Ok(Async::Ready(Ok(res))) => Ok(Async::Ready(Some(res))),
-            Ok(Async::Ready(Err(Error::Data))) => Err(()),
-            Ok(Async::Ready(Err(Error::Network))) => Err(()),
+            Ok(Async::Ready(Err(Error::Data))) => Err(Error::Data),
+            Ok(Async::Ready(Err(Error::Network))) => Err(Error::Network),
             Ok(Async::Ready(Err(Error::EOF))) => Ok(Async::Ready(None)),
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(_) => Err(()),
+            Err(_) => panic!("Panic when trying to receive a task"),
         }
     }
 }

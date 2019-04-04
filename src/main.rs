@@ -78,4 +78,5 @@ fn main() {
 
     info!("Ana start judging");
     start_judging(judge_threads, judge_receiver, report_sender);
+    info!("Ana stop judging");
 }
