@@ -1,6 +1,6 @@
 /// Workspace on tmpfs
 ///
-/// Use fuse rewrite in the future for
+/// TODO: Use fuse rewrite in the future for
 /// better performance and less memory usage
 use std::fs;
 use std::path;
