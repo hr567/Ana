@@ -42,8 +42,6 @@ A message is a json string and defined as following examples.
 
   Normal problem:
 
-  Set type to "normal", and keep the checker empty.
-
   ```json
   {
     "id": "b6555832ef2111e8bc847470fd3b4381",
@@ -52,13 +50,9 @@ A message is a json string and defined as following examples.
       "code": "..."
     },
     "problem": {
-      "problem_type": "normal",
+      "type": "Normal",
       "time_limit": 1000000000,
       "memory_limit": 33554432,
-      "checker": {
-        "language": "",
-        "code": ""
-      },
       "test_cases": [
         {
           "input": "1 1",
@@ -87,10 +81,10 @@ A message is a json string and defined as following examples.
       "code": "..."
     },
     "problem": {
-      "problem_type": "spj",
+      "type": "Special",
       "time_limit": 1000000000,
       "memory_limit": 33554432,
-      "checker": {
+      "spj": {
         "language": "cpp.gxx",
         "code": "..."
       },
