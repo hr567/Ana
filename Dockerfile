@@ -14,7 +14,7 @@ RUN apt-get update && \
     gcc \
     g++ && \
     apt-get clean
-COPY --from=build /Ana/target/release/ana /usr/local/bin
+COPY --from=build /Ana/target/debug/ana /usr/local/bin
 ENV RUST_BACKTRACE=1
 ENV RUST_LOG=debug
 EXPOSE 8800 8801
