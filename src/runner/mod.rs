@@ -50,7 +50,7 @@ pub fn launch(
     child.before_unfreeze(child_hook);
     child
         .env_clear()
-        .arg0("main")
+        .arg0("/main")
         // .uid(65534)
         // .gid(65534)
         .unshare(&[
