@@ -33,9 +33,9 @@ pub fn launch(
         let cpu_procs = cg.cpu_cgroup_path().join("cgroup.procs");
         let memory_procs = cg.memory_cgroup_path().join("cgroup.procs");
         move |pid: u32| {
-            fs::write(&cpu_procs, format!("{}", pid))
+            fs::write(&cpu_procs, pid.to_string())
                 .expect("Failed to write to time cgroup processes");
-            fs::write(&memory_procs, format!("{}", pid))
+            fs::write(&memory_procs, pid.to_string())
                 .expect("Failed to write to memory cgroup processes");
             thread::spawn(move || {
                 thread::sleep(time::Duration::from_nanos(time_limit / 2 * 3));
@@ -89,8 +89,9 @@ impl Future for LaunchFuture {
     type Item = LaunchResult;
     type Error = ();
     fn poll(&mut self) -> Poll<LaunchResult, ()> {
-        match tokio_threadpool::blocking(|| {
-            self.child.status().expect("Failed to spawn child process")
+        match tokio_threadpool::blocking(|| match self.child.status() {
+            Ok(res) => res,
+            Err(e) => panic!("Failed to spawn child process: {}", e),
         }) {
             Ok(Async::Ready(status)) => {
                 let res = LaunchResult {
