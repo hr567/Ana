@@ -1,5 +1,7 @@
 use std::path;
 use std::process;
+use std::thread;
+use std::time;
 
 use super::*;
 
@@ -15,7 +17,7 @@ impl Compiler for CppGxx {
     fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> bool {
         let source_file =
             rename_with_new_extension(&source_file, "cpp").expect("Failed to rename source file");
-        process::Command::new("g++")
+        let mut child = process::Command::new("g++")
             .stdin(process::Stdio::null())
             .stdout(process::Stdio::null())
             .stderr(process::Stdio::piped())
@@ -29,10 +31,20 @@ impl Compiler for CppGxx {
             .arg("--static")
             .arg("--std=c++11")
             .spawn()
-            .expect("Failed to run g++")
-            .wait()
-            .expect("Failed when waiting compiler to exit")
-            .success()
+            .expect("Failed to run g++");
+        let mut compile_success = false;
+        let start_compiling_time = time::Instant::now();
+        while start_compiling_time.elapsed() < time::Duration::from_secs(10) {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    compile_success = status.success();
+                    break;
+                }
+                Ok(None) => thread::sleep(time::Duration::from_millis(500)),
+                Err(e) => panic!("Error attempting to wait: {}", e),
+            }
+        }
+        compile_success
     }
 }
 
