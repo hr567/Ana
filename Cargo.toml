@@ -1,6 +1,6 @@
 [package]
 name = "ana"
-version = "0.7.0"
+version = "0.7.1"
 description = "A judge in Rust"
 license = "MIT"
 readme = "README.md"
@@ -11,7 +11,7 @@ edition = "2018"
 [dependencies]
 clap = "2.*"
 env_logger = "0.6"
-# fuse = "*"
+# fuse = "0.3"
 libmount = "0.1"
 log = "0.4"
 nix = "0.13"
@@ -21,7 +21,6 @@ serde_derive = "1.*"
 tempfile = "3.*"
 tokio = "0.1"
 tokio-threadpool = "0.1"
-unshare = "0.5"
 uuid = { version = "0.7", features = ["v4"] }
 zmq = { version = "0.9", optional = true }
 

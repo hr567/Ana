@@ -206,7 +206,7 @@ fn generate_normal_problem_report(
     let answer_file = case_dir.answer_file();
 
     let runner::LaunchResult {
-        exit_code,
+        exit_success,
         real_time_usage,
         cpu_time_usage,
         memory_usage,
@@ -217,7 +217,7 @@ fn generate_normal_problem_report(
         mtp::JudgeResult::MLE
     } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit / 2 * 3) {
         mtp::JudgeResult::TLE
-    } else if exit_code != 0 {
+    } else if !exit_success {
         mtp::JudgeResult::RE
     } else if diff::check(&output_file, &answer_file).unwrap_or(false) {
         mtp::JudgeResult::AC
@@ -242,7 +242,7 @@ fn generate_special_judge_problem_report(
     let spj_file = problem_dir.spj_file();
 
     let runner::LaunchResult {
-        exit_code,
+        exit_success,
         real_time_usage,
         cpu_time_usage,
         memory_usage,
@@ -253,7 +253,7 @@ fn generate_special_judge_problem_report(
         mtp::JudgeResult::MLE
     } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit / 2 * 3) {
         mtp::JudgeResult::TLE
-    } else if exit_code != 0 {
+    } else if !exit_success {
         mtp::JudgeResult::RE
     } else if diff::check_with_spj(&input_file, &output_file, &answer_file, &spj_file)
         .unwrap_or(false)
