@@ -20,7 +20,7 @@ impl Compiler for CppGxx {
         let mut child = process::Command::new("g++")
             .stdin(process::Stdio::null())
             .stdout(process::Stdio::null())
-            .stderr(process::Stdio::piped())
+            .stderr(process::Stdio::null())
             .arg(source_file.as_os_str())
             .arg("-o")
             .arg(executable_file.as_os_str())
@@ -34,15 +34,16 @@ impl Compiler for CppGxx {
             .expect("Failed to run g++");
         let mut compile_success = false;
         let start_compiling_time = time::Instant::now();
-        while start_compiling_time.elapsed() < time::Duration::from_secs(10) {
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    compile_success = status.success();
-                    break;
-                }
-                Ok(None) => thread::sleep(time::Duration::from_millis(500)),
-                Err(e) => panic!("Error attempting to wait: {}", e),
+        loop {
+            if start_compiling_time.elapsed().as_millis() >= 5000 {
+                child.kill().expect("Failed to kill compiler");
+                break;
             }
+            if let Some(status) = child.try_wait().expect("Failed to check compiler status") {
+                compile_success = status.success();
+                break;
+            }
+            thread::sleep(time::Duration::from_millis(100));
         }
         compile_success
     }

@@ -41,7 +41,7 @@ pub fn launch(
             .expect("Failed to write to memory cgroup processes");
             thread::spawn(move || {
                 thread::sleep(time::Duration::from_nanos(time_limit / 2 * 3));
-                nix::sys::signal::kill(pid, Some(nix::sys::signal::SIGKILL)).unwrap_or_else(|e| {
+                nix::sys::signal::kill(pid, nix::sys::signal::SIGKILL).unwrap_or_else(|e| {
                     assert_eq!(
                         e,
                         nix::Error::Sys(nix::errno::Errno::ESRCH),
