@@ -6,9 +6,11 @@ use std::path;
 use std::thread;
 use std::time;
 
+use caps;
 use nix;
 use tokio::prelude::*;
 use tokio_threadpool;
+
 mod cgroup;
 
 #[derive(Debug)]
@@ -76,6 +78,7 @@ pub fn launch(
             let output_fd = fs::File::create(output_file)
                 .expect("Failed to create output file")
                 .into_raw_fd();
+
             nix::unistd::dup2(input_fd, io::stdin().as_raw_fd()).expect("Failed to dup stdin");
             nix::unistd::dup2(output_fd, io::stdout().as_raw_fd()).expect("Failed to dup stdout");
             nix::unistd::close(input_fd).expect("Failed to close input file");
@@ -83,6 +86,9 @@ pub fn launch(
 
             nix::unistd::chroot(chroot_dir).expect("Failed to chroot");
             nix::unistd::chdir("/").expect("Failed to chdir");
+
+            caps::clear(None, caps::CapSet::Permitted).expect("Failed to clear all capabilities");
+
             nix::unistd::execvpe(&ffi::CString::new("/main").unwrap(), &[], &[])
                 .expect("Failed to exec child process");
 

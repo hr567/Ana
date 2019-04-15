@@ -1,6 +1,6 @@
 [package]
 name = "ana"
-version = "0.7.1"
+version = "0.7.2"
 description = "A judge in Rust"
 license = "MIT"
 readme = "README.md"
@@ -9,6 +9,7 @@ authors = ["hr567 <hr567@hr567.me>"]
 edition = "2018"
 
 [dependencies]
+caps = "0.3"
 clap = "2.*"
 env_logger = "0.6"
 # fuse = "0.3"
