@@ -16,12 +16,8 @@ pub fn syscall(name: &str) -> i32 {
 }
 
 #[repr(u32)]
-#[allow(dead_code)]
 pub enum ScmpAct {
-    KillProcess = SCMP_ACT_KILL_PROCESS,
-    Kill = SCMP_ACT_KILL, // Also known as SCMP_ACT_KILL_THREAD
-    Trap = SCMP_ACT_TRAP,
-    Log = SCMP_ACT_LOG,
+    Kill = SCMP_ACT_KILL,
     Allow = SCMP_ACT_ALLOW,
 }
 
@@ -60,7 +56,7 @@ pub struct ScmpCtx {
 impl ScmpCtx {
     pub fn new() -> ScmpCtx {
         ScmpCtx {
-            ctx: unsafe { seccomp_init(SCMP_ACT_KILL) },
+            ctx: unsafe { seccomp_init(ScmpAct::Kill as u32) },
         }
     }
 
