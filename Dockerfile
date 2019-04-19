@@ -2,7 +2,7 @@ FROM rust:slim AS build
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
-    libseccomp2-dev \
+    libseccomp-dev \
     llvm-dev \
     libclang-dev \
     clang \
@@ -15,7 +15,7 @@ FROM ubuntu:18.04
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
-    libseccomp2-dev \
+    libseccomp-dev \
     gcc \
     g++ && \
     apt-get clean
