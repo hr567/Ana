@@ -28,39 +28,6 @@ pub struct RunnerReport {
     pub mle_flag: bool,
 }
 
-/// Use input file to replace stdin and
-/// use output file to replace stdout
-fn replace_stdio(input_file: impl AsRef<path::Path>, output_file: impl AsRef<path::Path>) {
-    let input_fd = fs::File::open(input_file)
-        .expect("Failed to open input file")
-        .into_raw_fd();
-    let output_fd = fs::File::create(output_file)
-        .expect("Failed to create output file")
-        .into_raw_fd();
-    nix::unistd::dup2(input_fd, io::stdin().as_raw_fd()).expect("Failed to dup stdin");
-    nix::unistd::dup2(output_fd, io::stdout().as_raw_fd()).expect("Failed to dup stdout");
-    nix::unistd::close(input_fd).expect("Failed to close input file");
-    nix::unistd::close(output_fd).expect("Failed to close output file");
-}
-
-/// Unshare some namespaces
-fn unshare_namespace() {
-    nix::sched::unshare(
-        nix::sched::CloneFlags::empty()
-            | nix::sched::CloneFlags::CLONE_FILES
-            | nix::sched::CloneFlags::CLONE_FS
-            | nix::sched::CloneFlags::CLONE_NEWCGROUP
-            | nix::sched::CloneFlags::CLONE_NEWIPC
-            | nix::sched::CloneFlags::CLONE_NEWNET
-            | nix::sched::CloneFlags::CLONE_NEWNS
-            | nix::sched::CloneFlags::CLONE_NEWPID
-            | nix::sched::CloneFlags::CLONE_NEWUSER
-            | nix::sched::CloneFlags::CLONE_NEWUTS
-            | nix::sched::CloneFlags::CLONE_SYSVSEM,
-    )
-    .expect("Failed to unshare namespace");
-}
-
 pub fn run(
     chroot_dir: Option<impl AsRef<path::Path>>,
     program: impl AsRef<path::Path>,
@@ -97,16 +64,40 @@ pub fn run(
         }
 
         nix::unistd::ForkResult::Child => {
-            let program_command =
-                ffi::CString::new(program.as_ref().as_os_str().as_bytes()).unwrap();
+            // Replace stdio with files
+            let input_fd = fs::File::open(input_file)
+                .expect("Failed to open input file")
+                .into_raw_fd();
+            let output_fd = fs::File::create(output_file)
+                .expect("Failed to create output file")
+                .into_raw_fd();
+            nix::unistd::dup2(input_fd, io::stdin().as_raw_fd()).expect("Failed to dup stdin");
+            nix::unistd::dup2(output_fd, io::stdout().as_raw_fd()).expect("Failed to dup stdout");
+            nix::unistd::close(input_fd).expect("Failed to close input file");
+            nix::unistd::close(output_fd).expect("Failed to close output file");
 
-            replace_stdio(input_file, output_file);
-            unshare_namespace();
+            // Unshare namespace
+            nix::sched::unshare(
+                nix::sched::CloneFlags::empty()
+                    | nix::sched::CloneFlags::CLONE_FILES
+                    | nix::sched::CloneFlags::CLONE_FS
+                    | nix::sched::CloneFlags::CLONE_NEWCGROUP
+                    | nix::sched::CloneFlags::CLONE_NEWIPC
+                    | nix::sched::CloneFlags::CLONE_NEWNET
+                    | nix::sched::CloneFlags::CLONE_NEWNS
+                    | nix::sched::CloneFlags::CLONE_NEWPID
+                    | nix::sched::CloneFlags::CLONE_NEWUSER
+                    | nix::sched::CloneFlags::CLONE_NEWUTS
+                    | nix::sched::CloneFlags::CLONE_SYSVSEM,
+            )
+            .expect("Failed to unshare namespace");
 
-            // Chroot and chdir
+            // Chroot if needed
             if let Some(chroot_dir) = chroot_dir {
                 nix::unistd::chroot(chroot_dir.as_ref()).expect("Failed to chroot");
             }
+
+            // Change directory to root
             nix::unistd::chdir("/").expect("Failed to chdir");
 
             unsafe {
@@ -114,44 +105,48 @@ pub fn run(
                 nix::libc::prctl(nix::libc::PR_SET_DUMPABLE, 0);
             }
 
+            // Clear all capabilities
             caps::clear(None, caps::CapSet::Permitted).expect("Failed to clear all capabilities");
 
-            {
-                let whitelist: [i32; 16] = [
-                    seccomp::syscall("access"),
-                    seccomp::syscall("arch_prctl"),
-                    seccomp::syscall("brk"),
-                    seccomp::syscall("close"),
-                    seccomp::syscall("exit_group"),
-                    seccomp::syscall("fstat"),
-                    seccomp::syscall("lseek"),
-                    seccomp::syscall("mmap"),
-                    seccomp::syscall("mprotect"),
-                    seccomp::syscall("munmap"),
-                    seccomp::syscall("read"),
-                    seccomp::syscall("readlink"),
-                    seccomp::syscall("sysinfo"),
-                    seccomp::syscall("uname"),
-                    seccomp::syscall("write"),
-                    seccomp::syscall("writev"),
-                ];
+            // Change program to C-style string
+            let program_command =
+                ffi::CString::new(program.as_ref().as_os_str().as_bytes()).unwrap();
 
-                let scmp = seccomp::ScmpCtx::new();
-                for syscall in &whitelist {
-                    scmp.whitelist(*syscall as u32, Vec::new())
-                        .expect("Failed to add syscall to whitelist");
-                }
-                scmp.whitelist(
-                    seccomp::syscall("execve") as u32,
-                    vec![seccomp::ScmpArg::new(
-                        0,
-                        seccomp::ScmpCmp::EQ,
-                        program_command.as_ptr() as u64,
-                    )],
-                )
-                .expect("Failed to add execve to whitelist");
-                scmp.load().expect("Failed to set seccomp");
+            // Use seccomp to prevent some system calls
+            let scmp = seccomp::ScmpCtx::new(); // Default rule is kill
+            for syscall in &[
+                seccomp::syscall("access"),
+                seccomp::syscall("arch_prctl"),
+                seccomp::syscall("brk"),
+                seccomp::syscall("close"),
+                seccomp::syscall("exit_group"),
+                seccomp::syscall("fstat"),
+                seccomp::syscall("lseek"),
+                seccomp::syscall("mmap"),
+                seccomp::syscall("mprotect"),
+                seccomp::syscall("munmap"),
+                seccomp::syscall("read"),
+                seccomp::syscall("readlink"),
+                seccomp::syscall("sysinfo"),
+                seccomp::syscall("uname"),
+                seccomp::syscall("write"),
+                seccomp::syscall("writev"),
+            ] {
+                scmp.whitelist(*syscall as u32, Vec::new())
+                    .expect("Failed to add syscall to whitelist");
             }
+
+            // Only allow exec program
+            scmp.whitelist(
+                seccomp::syscall("execve") as u32,
+                vec![seccomp::ScmpArg::new(
+                    0,
+                    seccomp::ScmpCmp::EQ,
+                    program_command.as_ptr() as u64,
+                )],
+            )
+            .expect("Failed to add execve to whitelist");
+            scmp.load().expect("Failed to set seccomp");
 
             nix::unistd::execvpe(&program_command, &[program_command.clone()], &[])
                 .expect("Failed to exec child process");
