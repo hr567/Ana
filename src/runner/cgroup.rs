@@ -2,8 +2,10 @@ use std::fs;
 use std::path;
 use std::str;
 use std::sync;
+use std::time;
 
 use log::*;
+use nix;
 
 static INIT_ANA_CGROUP: sync::Once = sync::Once::new();
 
@@ -12,8 +14,8 @@ const MEMORY_CGROUP_PATH: &str = "/sys/fs/cgroup/memory/ana";
 
 pub struct Cgroup {
     pub name: String,
-    pub cpu_time_limit: u64,
-    pub memory_usage_limit: u64,
+    pub cpu_time_limit: time::Duration,
+    pub memory_usage_limit: usize,
 }
 
 impl Cgroup {
@@ -35,12 +37,12 @@ impl Cgroup {
     fn apply_cpu_time_limit(&self) {
         fs::write(
             &self.cpu_cgroup_path().join("cpu.cfs_period_us"),
-            format!("{}", self.cpu_time_limit / 1000),
+            format!("{}", time::Duration::from_millis(500).as_micros()),
         )
         .unwrap();
         fs::write(
             &self.cpu_cgroup_path().join("cpu.cfs_quota_us"),
-            format!("{}", self.cpu_time_limit / 1000),
+            format!("{}", time::Duration::from_millis(500).as_micros()),
         )
         .unwrap();
     }
@@ -61,14 +63,14 @@ impl Cgroup {
 }
 
 impl Cgroup {
-    pub fn new(cpu_time_limit: u64, memory_usage_limit: u64) -> Cgroup {
+    pub fn new(cpu_time_limit: time::Duration, memory_usage_limit: usize) -> Cgroup {
         INIT_ANA_CGROUP.call_once(|| {
+            fs::create_dir_all(CPU_CGROUP_PATH).expect("Failed to create cpu cgroup");
+            fs::create_dir_all(MEMORY_CGROUP_PATH).expect("Failed to create memory cgroup");
             debug!(
                 "Ana cgroup is created in {} and {}",
                 CPU_CGROUP_PATH, MEMORY_CGROUP_PATH,
             );
-            fs::create_dir_all(CPU_CGROUP_PATH).expect("Failed to create cpu cgroup");
-            fs::create_dir_all(MEMORY_CGROUP_PATH).expect("Failed to create memory cgroup");
         });
         let name = uuid::Uuid::new_v4();
         let ret = Cgroup {
@@ -84,18 +86,32 @@ impl Cgroup {
         ret
     }
 
-    pub fn get_cpu_time_usage(&self) -> u64 {
-        let buf = fs::read(&self.cpu_cgroup_path().join("cpuacct.usage")).unwrap();
-        str::from_utf8(&buf).unwrap().trim().parse().unwrap()
+    pub fn add_process(&self, pid: nix::unistd::Pid) {
+        fs::write(
+            &self.cpu_cgroup_path().join("cgroup.procs"),
+            format!("{}", pid),
+        )
+        .expect("Failed to write to time cgroup processes");
+        fs::write(
+            &self.memory_cgroup_path().join("cgroup.procs"),
+            format!("{}", pid),
+        )
+        .expect("Failed to write to memory cgroup processes");
     }
 
-    pub fn get_memory_usage(&self) -> u64 {
+    pub fn get_cpu_time_usage(&self) -> time::Duration {
+        let buf = fs::read(&self.cpu_cgroup_path().join("cpuacct.usage")).unwrap();
+        let time_ns = str::from_utf8(&buf).unwrap().trim().parse().unwrap();
+        time::Duration::from_nanos(time_ns)
+    }
+
+    pub fn get_memory_usage(&self) -> usize {
         let buf = fs::read(&self.memory_cgroup_path().join("memory.max_usage_in_bytes")).unwrap();
         str::from_utf8(&buf).unwrap().trim().parse().unwrap()
     }
 
     pub fn is_time_limit_exceeded(&self) -> bool {
-        self.get_cpu_time_usage() >= self.cpu_time_limit
+        self.get_cpu_time_usage() > self.cpu_time_limit
     }
 
     fn memory_fail_count(&self) -> usize {
@@ -104,7 +120,7 @@ impl Cgroup {
     }
 
     pub fn is_memory_limit_exceeded(&self) -> bool {
-        self.memory_fail_count() != 0
+        self.memory_fail_count() > 0
     }
 }
 

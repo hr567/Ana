@@ -2,6 +2,9 @@ FROM rust:slim AS build
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libzmq3-dev \
+    llvm-dev \
+    libclang-dev \
+    clang \
     pkg-config
 COPY . /Ana
 RUN cd /Ana && \

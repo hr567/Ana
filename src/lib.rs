@@ -107,13 +107,17 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
                 return;
             }
 
+            let time_limit = time::Duration::from_nanos(time_limit);
+            let memory_limit = memory_limit as usize;
+
             for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
             {
                 debug!("Testing test case #{}", index);
-                let launch_result = runner::launch(
-                    &work_dir.runtime_dir(),
-                    &test_case_dir.input_file(),
-                    &test_case_dir.output_file(),
+                let runner_report = runner::run(
+                    Some(work_dir.runtime_dir()),
+                    "/main",
+                    test_case_dir.input_file(),
+                    test_case_dir.output_file(),
                     time_limit,
                     memory_limit,
                 )
@@ -125,7 +129,7 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
                     memory_limit,
                     &work_dir.problem_dir(),
                     index,
-                    launch_result,
+                    runner_report,
                 );
                 debug!("[#{}] Generated report: {:?}", index, &report);
                 report_sender.send(report).expect("Failed to send report");
@@ -145,6 +149,9 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
                 return;
             }
 
+            let time_limit = time::Duration::from_nanos(time_limit);
+            let memory_limit = memory_limit as usize;
+
             let spj_compile_success = {
                 let mtp::Source {
                     language: spj_source_language,
@@ -161,10 +168,11 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
             for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
             {
                 debug!("Testing test case #{}", index);
-                let launch_result = runner::launch(
-                    &work_dir.runtime_dir(),
-                    &test_case_dir.input_file(),
-                    &test_case_dir.output_file(),
+                let runner_report = runner::run(
+                    Some(work_dir.runtime_dir()),
+                    "/main",
+                    test_case_dir.input_file(),
+                    test_case_dir.output_file(),
                     time_limit,
                     memory_limit,
                 )
@@ -176,7 +184,7 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
                     memory_limit,
                     &work_dir.problem_dir(),
                     index,
-                    launch_result,
+                    runner_report,
                 );
                 debug!("[#{}] Generated report: {:?}", index, &report);
                 report_sender.send(report).expect("Failed to send report");
@@ -195,74 +203,87 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
 /// threads working in one time or the program use sleep.
 fn generate_normal_problem_report(
     id: &str,
-    time_limit: u64,
-    memory_limit: u64,
+    time_limit: time::Duration,
+    memory_limit: usize,
     problem_dir: &path::Path,
     test_case_index: usize,
-    launch_result: runner::LaunchResult,
+    runner_report: runner::RunnerReport,
 ) -> mtp::JudgeReport {
     let case_dir = &problem_dir.test_case_dirs()[test_case_index];
-    let output_file = case_dir.output_file();
-    let answer_file = case_dir.answer_file();
 
-    let runner::LaunchResult {
+    let runner::RunnerReport {
         exit_success,
         real_time_usage,
         cpu_time_usage,
         memory_usage,
         tle_flag,
         mle_flag,
-    } = launch_result;
+    } = runner_report;
+
     let status = if mle_flag || memory_usage >= memory_limit {
         mtp::JudgeResult::MLE
-    } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit / 2 * 3) {
+    } else if tle_flag || real_time_usage >= time_limit * 2 {
         mtp::JudgeResult::TLE
     } else if !exit_success {
         mtp::JudgeResult::RE
-    } else if diff::check(&output_file, &answer_file).unwrap_or(false) {
+    } else if diff::check(&case_dir.output_file(), &case_dir.answer_file()).unwrap_or(false) {
         mtp::JudgeResult::AC
     } else {
         mtp::JudgeResult::WA
     };
-    mtp::JudgeReport::new(&id, test_case_index, status, cpu_time_usage, memory_usage)
+
+    mtp::JudgeReport::new(
+        &id,
+        test_case_index,
+        status,
+        cpu_time_usage.as_nanos() as u64,
+        memory_usage as u64,
+    )
 }
 
 fn generate_special_judge_problem_report(
     id: &str,
-    time_limit: u64,
-    memory_limit: u64,
+    time_limit: time::Duration,
+    memory_limit: usize,
     problem_dir: &path::Path,
     test_case_index: usize,
-    launch_result: runner::LaunchResult,
+    runner_report: runner::RunnerReport,
 ) -> mtp::JudgeReport {
     let case_dir = &problem_dir.test_case_dirs()[test_case_index];
-    let input_file = case_dir.input_file();
-    let output_file = case_dir.output_file();
-    let answer_file = case_dir.answer_file();
-    let spj_file = problem_dir.spj_file();
 
-    let runner::LaunchResult {
+    let runner::RunnerReport {
         exit_success,
         real_time_usage,
         cpu_time_usage,
         memory_usage,
         tle_flag,
         mle_flag,
-    } = launch_result;
+    } = runner_report;
     let status = if mle_flag || memory_usage >= memory_limit {
         mtp::JudgeResult::MLE
-    } else if tle_flag || real_time_usage >= time::Duration::from_nanos(time_limit / 2 * 3) {
+    } else if tle_flag || real_time_usage >= time_limit * 2 {
         mtp::JudgeResult::TLE
     } else if !exit_success {
         mtp::JudgeResult::RE
-    } else if diff::check_with_spj(&input_file, &output_file, &answer_file, &spj_file)
-        .unwrap_or(false)
+    } else if diff::check_with_spj(
+        &case_dir.input_file(),
+        &case_dir.output_file(),
+        &case_dir.answer_file(),
+        &problem_dir.spj_file(),
+    )
+    .unwrap_or(false)
     {
         mtp::JudgeResult::AC
     } else {
         mtp::JudgeResult::WA
     };
-    mtp::JudgeReport::new(&id, test_case_index, status, cpu_time_usage, memory_usage)
+    mtp::JudgeReport::new(
+        &id,
+        test_case_index,
+        status,
+        cpu_time_usage.as_nanos() as u64,
+        memory_usage as u64,
+    )
 }
 
 #[cfg(test)]
