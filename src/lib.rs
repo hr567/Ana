@@ -1,6 +1,5 @@
+use std::iter;
 use std::path;
-use std::sync;
-use std::thread;
 use std::time;
 
 use log::*;
@@ -35,27 +34,21 @@ pub fn start_judging<T, U>(
         .pool_size(judge_threads)
         .build();
 
-    let (tx, rx) = sync::mpsc::channel();
-
-    thread::spawn(move || {
-        for report in rx {
-            report_sender
-                .send(report)
-                .unwrap_or_else(|_| error!("Failed to send report"));
-        }
-    });
-
     let server = judge_receiver
         .map_err(|e| match e {
             communicator::Error::Network => panic!("Network error"),
             communicator::Error::Data => panic!("Data error"),
-            communicator::Error::EOF => unimplemented!("EOF should not appear here"),
+            communicator::Error::EOF => unreachable!("EOF should not appear here"),
         })
         .for_each(move |judge_task| {
+            let sender = report_sender.clone();
             debug!("Received judge information: {:?}", &judge_task);
-            let tx = tx.clone();
             pool.spawn(future::lazy(move || {
-                judge(judge_task, tx);
+                for judge_report in judge(judge_task) {
+                    sender
+                        .send(judge_report)
+                        .expect("Failed to send judge report");
+                }
                 Ok(())
             }));
             Ok(())
@@ -65,7 +58,7 @@ pub fn start_judging<T, U>(
 }
 
 /// Judge the task and generate a list of reports
-fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::JudgeReport>) {
+fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::JudgeReport>> {
     debug!("[Start] Judge task :{}", &judge_task.id);
 
     let work_dir = WorkSpace::new();
@@ -101,39 +94,45 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
         } => {
             if !compile_success {
                 let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
-                report_sender
-                    .send(ce_report)
-                    .expect("Failed to send report");
-                return;
+                return Box::new(iter::once(ce_report));
             }
 
             let time_limit = time::Duration::from_nanos(time_limit);
             let memory_limit = memory_limit as usize;
 
-            for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
-            {
-                debug!("Testing test case #{}", index);
-                let runner_report = runner::run(
-                    Some(work_dir.runtime_dir()),
-                    "/main",
-                    test_case_dir.input_file(),
-                    test_case_dir.output_file(),
-                    time_limit,
-                    memory_limit,
-                )
-                .wait()
-                .expect("Failed to run compiled program");
-                let report = generate_normal_problem_report(
-                    &id,
-                    time_limit,
-                    memory_limit,
-                    &work_dir.problem_dir(),
-                    index,
-                    runner_report,
-                );
-                debug!("[#{}] Generated report: {:?}", index, &report);
-                report_sender.send(report).expect("Failed to send report");
-            }
+            let mut test_cases = work_dir
+                .problem_dir()
+                .test_case_dirs()
+                .into_iter()
+                .enumerate();
+
+            Box::new(iter::from_fn(move || {
+                if let Some((index, test_case_dir)) = test_cases.next() {
+                    debug!("Testing test case #{}", index);
+                    let runner_report = runner::run(
+                        Some(work_dir.runtime_dir()),
+                        "/main",
+                        test_case_dir.input_file(),
+                        test_case_dir.output_file(),
+                        time_limit,
+                        memory_limit,
+                    )
+                    .wait()
+                    .expect("Failed to run compiled program");
+                    let report = generate_normal_problem_report(
+                        &id,
+                        time_limit,
+                        memory_limit,
+                        &work_dir.problem_dir(),
+                        index,
+                        runner_report,
+                    );
+                    debug!("[#{}] Generated report: {:?}", index, &report);
+                    Some(report)
+                } else {
+                    None
+                }
+            }))
         }
         mtp::Problem::Special {
             time_limit,
@@ -143,10 +142,7 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
         } => {
             if !compile_success {
                 let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
-                report_sender
-                    .send(ce_report)
-                    .expect("Failed to send report");
-                return;
+                return Box::new(iter::once(ce_report));
             }
 
             let time_limit = time::Duration::from_nanos(time_limit);
@@ -165,33 +161,41 @@ fn judge(judge_task: mtp::JudgeTask, report_sender: sync::mpsc::Sender<mtp::Judg
             };
             assert!(spj_compile_success, "Failed to compile spj");
 
-            for (index, test_case_dir) in work_dir.problem_dir().test_case_dirs().iter().enumerate()
-            {
-                debug!("Testing test case #{}", index);
-                let runner_report = runner::run(
-                    Some(work_dir.runtime_dir()),
-                    "/main",
-                    test_case_dir.input_file(),
-                    test_case_dir.output_file(),
-                    time_limit,
-                    memory_limit,
-                )
-                .wait()
-                .expect("Failed to run compiled program");
-                let report = generate_special_judge_problem_report(
-                    &id,
-                    time_limit,
-                    memory_limit,
-                    &work_dir.problem_dir(),
-                    index,
-                    runner_report,
-                );
-                debug!("[#{}] Generated report: {:?}", index, &report);
-                report_sender.send(report).expect("Failed to send report");
-            }
+            let mut test_cases = work_dir
+                .problem_dir()
+                .test_case_dirs()
+                .into_iter()
+                .enumerate();
+
+            Box::new(iter::from_fn(move || {
+                if let Some((index, test_case_dir)) = test_cases.next() {
+                    debug!("Testing test case #{}", index);
+                    let runner_report = runner::run(
+                        Some(work_dir.runtime_dir()),
+                        "/main",
+                        test_case_dir.input_file(),
+                        test_case_dir.output_file(),
+                        time_limit,
+                        memory_limit,
+                    )
+                    .wait()
+                    .expect("Failed to run compiled program");
+                    let report = generate_special_judge_problem_report(
+                        &id,
+                        time_limit,
+                        memory_limit,
+                        &work_dir.problem_dir(),
+                        index,
+                        runner_report,
+                    );
+                    debug!("[#{}] Generated report: {:?}", index, &report);
+                    Some(report)
+                } else {
+                    None
+                }
+            }))
         }
     }
-    debug!("[Done] Judge task");
 }
 
 /// Generate the judge report using given data.
