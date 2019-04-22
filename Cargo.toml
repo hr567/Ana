@@ -1,6 +1,6 @@
 [package]
 name = "ana"
-version = "0.7.6"
+version = "0.7.7"
 description = "A judge in Rust"
 license = "MIT"
 readme = "README.md"

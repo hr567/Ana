@@ -10,13 +10,19 @@ use tempfile;
 
 use crate::mtp;
 
-pub struct WorkSpace {
+pub struct Workspace {
     inner: tempfile::TempDir,
 }
 
-impl WorkSpace {
-    pub fn new() -> WorkSpace {
-        let workspace = WorkSpace {
+impl Workspace {
+    pub fn new() -> Workspace {
+        Workspace::default()
+    }
+}
+
+impl Default for Workspace {
+    fn default() -> Workspace {
+        let workspace = Workspace {
             inner: tempfile::tempdir().expect("Failed to create a temp dir"),
         };
 
@@ -29,13 +35,13 @@ impl WorkSpace {
     }
 }
 
-impl AsRef<path::Path> for WorkSpace {
+impl AsRef<path::Path> for Workspace {
     fn as_ref(&self) -> &path::Path {
         self.inner.path()
     }
 }
 
-impl Drop for WorkSpace {
+impl Drop for Workspace {
     fn drop(&mut self) {
         nix::mount::umount(self.inner.path()).unwrap();
     }
@@ -74,7 +80,7 @@ pub trait TestCaseDir {
     fn prepare_test_case(&self, test_case: &mtp::TestCase);
 }
 
-impl WorkDir for WorkSpace {
+impl WorkDir for Workspace {
     fn source_file(&self) -> Box<path::Path> {
         self.inner.path().join("source").into_boxed_path()
     }

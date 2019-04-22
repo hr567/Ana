@@ -33,6 +33,10 @@ impl Problem {
             Special { test_cases, .. } => test_cases.len(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

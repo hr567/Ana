@@ -1,3 +1,4 @@
+/// Utils to compare two files line by line
 use std::fs;
 use std::io::{self, BufRead};
 use std::path;
