@@ -1,10 +1,7 @@
-use std::sync;
+use std::sync::{Arc, Mutex};
 
 use crate::mtp;
 use tokio::prelude::*;
-
-#[cfg(feature = "zmq_mod")]
-mod zmq;
 
 pub const EOF: &str = "EOF";
 
@@ -18,7 +15,6 @@ pub enum Error {
 /// The `Receiver` trait allows for receiving judge task
 pub trait Receiver {
     /// Receive a JudgeTask
-
     /// This method should block current thread until
     /// it receive a judge task and then return it.
     fn receive(&self) -> Result<mtp::JudgeTask, Error>;
@@ -60,7 +56,7 @@ impl<T: Receiver> Stream for TaskReceiver<T> {
     }
 }
 
-pub struct ReportSender<T: Sender>(sync::Arc<sync::Mutex<T>>);
+pub struct ReportSender<T: Sender>(Arc<Mutex<T>>);
 
 impl<T: Sender> Sender for ReportSender<T> {
     fn send(&self, report: mtp::JudgeReport) -> Result<(), Error> {
@@ -76,6 +72,6 @@ impl<T: Sender> Clone for ReportSender<T> {
 
 impl<T: Sender> From<T> for ReportSender<T> {
     fn from(inner: T) -> ReportSender<T> {
-        ReportSender(sync::Arc::new(sync::Mutex::new(inner)))
+        ReportSender(Arc::new(Mutex::new(inner)))
     }
 }

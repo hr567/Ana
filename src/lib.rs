@@ -16,45 +16,62 @@ pub mod workspace;
 use communicator::*;
 use workspace::*;
 
-/// The entry of judging
-/// Generate reports for every task from receiver and then send them
-/// Should be called only once
-pub fn start_judging<T, U>(
-    judge_threads: usize,
-    judge_receiver: impl Into<TaskReceiver<T>>,
-    report_sender: impl Into<ReportSender<U>>,
-) where
+pub struct Ana<T: Receiver, U: Sender> {
+    max_threads: usize,
+    task_receiver: TaskReceiver<T>,
+    report_sender: ReportSender<U>,
+}
+
+impl<T, U> Ana<T, U>
+where
     T: Receiver + Send + 'static,
     U: Sender + Send + 'static,
 {
-    let judge_receiver = judge_receiver.into();
-    let report_sender = report_sender.into();
+    pub fn new(
+        max_threads: usize,
+        task_receiver: impl Into<TaskReceiver<T>>,
+        report_sender: impl Into<ReportSender<U>>,
+    ) -> Ana<T, U> {
+        Ana {
+            max_threads,
+            task_receiver: task_receiver.into(),
+            report_sender: report_sender.into(),
+        }
+    }
 
-    let pool = tokio_threadpool::Builder::new()
-        .pool_size(judge_threads)
-        .build();
+    pub fn start(self) {
+        let Ana {
+            max_threads,
+            task_receiver,
+            report_sender,
+        } = self;
 
-    let server = judge_receiver
-        .map_err(|e| match e {
-            communicator::Error::Network => panic!("Network error"),
-            communicator::Error::Data => panic!("Data error"),
-            communicator::Error::EOF => unreachable!("EOF should not appear here"),
-        })
-        .for_each(move |judge_task| {
-            let sender = report_sender.clone();
-            debug!("Received judge information: {:?}", &judge_task);
-            pool.spawn(future::lazy(move || {
-                for judge_report in judge(judge_task) {
-                    sender
-                        .send(judge_report)
-                        .expect("Failed to send judge report");
-                }
+        let pool = tokio_threadpool::Builder::new()
+            .pool_size(max_threads)
+            .build();
+
+        let server = task_receiver
+            .map_err(|e| match e {
+                communicator::Error::Network => panic!("Network error"),
+                communicator::Error::Data => panic!("Data error"),
+                communicator::Error::EOF => unreachable!("EOF should not appear here"),
+            })
+            .for_each(move |judge_task| {
+                let sender = report_sender.clone();
+                debug!("Received judge information: {:?}", &judge_task);
+                pool.spawn(future::lazy(move || {
+                    for judge_report in judge(judge_task) {
+                        sender
+                            .send(judge_report)
+                            .expect("Failed to send judge report");
+                    }
+                    Ok(())
+                }));
                 Ok(())
-            }));
-            Ok(())
-        });
+            });
 
-    tokio::run(server);
+        tokio::run(server);
+    }
 }
 
 /// Judge the task and generate a list of reports

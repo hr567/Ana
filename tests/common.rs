@@ -1,4 +1,8 @@
-use ana::*;
+use ana::Ana;
+
+use ana::communicator::Error;
+use ana::communicator::*;
+use ana::mtp;
 
 use std::fs;
 use std::path;
@@ -8,8 +12,6 @@ use std::thread;
 use serde_json;
 use uuid::prelude::*;
 use zmq;
-
-use communicator::EOF;
 
 pub const NS_PER_SEC: f64 = 1_000_000_000 as f64;
 pub const BYTES_PER_MB: f64 = (1024 * 1024) as f64;
@@ -23,6 +25,41 @@ pub const SOURCE_MLE: &str = "example/source.mle.cpp";
 pub const SOURCE_RE: &str = "example/source.re.cpp";
 pub const SOURCE_TLE: &str = "example/source.tle.cpp";
 pub const SOURCE_WA: &str = "example/source.wa.cpp";
+
+struct ZmqSocket(zmq::Socket);
+
+impl Receiver for ZmqSocket {
+    /// Receive a judge task from zmq socket.
+    ///
+    /// Return Err(Network) if the socket cannot receive any data from network.
+    /// Return Err(Data) if received message cannot be deserialized.
+    /// Return Err(Eof) if received message is EOF
+    fn receive(&self) -> Result<mtp::JudgeTask, Error> {
+        if let Ok(buf) = self.0.recv_bytes(0) {
+            if buf == EOF.as_bytes() {
+                return Err(Error::EOF);
+            }
+            match serde_json::from_slice(&buf) {
+                Ok(res) => Ok(res),
+                Err(_) => Err(Error::Data),
+            }
+        } else {
+            Err(Error::Network)
+        }
+    }
+}
+
+impl Sender for ZmqSocket {
+    /// Send a judge report to zmq socket.
+    ///
+    /// Return Err(Network) if the socket failed to send the report.
+    fn send(&self, report: mtp::JudgeReport) -> Result<(), Error> {
+        match self.0.send(&report.to_json(), 0) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(Error::Network),
+        }
+    }
+}
 
 pub struct Judge {
     judge_sender: zmq::Socket,
@@ -40,7 +77,7 @@ impl Judge {
         let (report_sender, report_receiver) =
             create_zmq_socket_pair(&format!("inproc://{}-report", &name));
         thread::spawn(move || {
-            start_judging(1, judge_receiver, report_sender);
+            Ana::new(1, ZmqSocket(judge_receiver), ZmqSocket(report_sender)).start();
         });
         Judge {
             judge_sender,

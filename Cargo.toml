@@ -1,6 +1,6 @@
 [package]
 name = "ana"
-version = "0.7.7"
+version = "0.7.8"
 description = "A judge in Rust"
 license = "MIT"
 readme = "README.md"
@@ -23,7 +23,7 @@ tempfile = "3.*"
 tokio = "0.1"
 tokio-threadpool = "0.1"
 uuid = { version = "0.7", features = ["v4"] }
-zmq = { version = "0.9", optional = true }
+zmq = "0.9"
 
 [dev-dependencies]
 
@@ -31,8 +31,7 @@ zmq = { version = "0.9", optional = true }
 bindgen = "0.49"
 
 [features]
-default = ["gcc", "gxx", "zmq_mod"]
+default = ["gcc", "gxx"]
 
 gcc = []
 gxx = []
-zmq_mod = ["zmq"]
