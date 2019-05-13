@@ -7,16 +7,12 @@ use super::*;
 
 pub struct CppGxx;
 
-impl CppGxx {
-    pub fn new() -> CppGxx {
-        CppGxx {}
-    }
-}
-
 impl Compiler for CppGxx {
-    fn compile(&self, source_file: &path::Path, executable_file: &path::Path) -> bool {
-        let source_file =
-            rename_with_new_extension(&source_file, "cpp").expect("Failed to rename source file");
+    const SOURCE_SUFFIX: &'static str = "cpp";
+
+    fn compile(source_file: &path::Path, executable_file: &path::Path) -> bool {
+        let source_file = rename_with_new_extension(&source_file, CppGxx::SOURCE_SUFFIX)
+            .expect("Failed to rename source file");
         let mut child = process::Command::new("g++")
             .stdin(process::Stdio::null())
             .stdout(process::Stdio::null())
@@ -63,7 +59,7 @@ mod tests {
         let source_file = work_dir.path().join("cpp_compiler_test_pass.cpp");
         let executable_file = work_dir.path().join("cpp_compiler_test_pass.exe");
         fs::write(&source_file, "#include<iostream>\nint main() { return 0; }").unwrap();
-        let compile_success = CppGxx::new().compile(&source_file, &executable_file);
+        let compile_success = CppGxx::compile(&source_file, &executable_file);
         assert!(compile_success);
     }
 
@@ -73,7 +69,7 @@ mod tests {
         let source_file = work_dir.path().join("cpp_compiler_test_fail.cpp");
         let executable_file = work_dir.path().join("cpp_compiler_test_fail.exe");
         fs::write(&source_file, "#include<iostream>\nint main() { return 0 }").unwrap();
-        let compile_success = CppGxx::new().compile(&source_file, &executable_file);
+        let compile_success = CppGxx::compile(&source_file, &executable_file);
         assert!(!compile_success);
     }
 }

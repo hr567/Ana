@@ -79,6 +79,7 @@ impl Judge {
         thread::spawn(move || {
             Ana::new(1, ZmqSocket(judge_receiver), ZmqSocket(report_sender)).start();
         });
+
         Judge {
             judge_sender,
             report_receiver,

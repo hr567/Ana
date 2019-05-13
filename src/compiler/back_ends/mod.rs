@@ -5,15 +5,18 @@ use std::io;
 
 #[cfg(feature = "gcc")]
 mod c_gcc;
+
 #[cfg(feature = "gxx")]
 mod cpp_gxx;
 
-pub fn get_compiler(language: &str) -> Result<Box<dyn Compiler>, &'static str> {
+pub fn get_compiler(language: &str) -> Result<fn(&path::Path, &path::Path) -> bool, &'static str> {
     match language {
         #[cfg(feature = "gcc")]
-        "c.gcc" => Ok(Box::new(c_gcc::CGcc::new())),
+        "c.gcc" => Ok(c_gcc::CGcc::compile),
+
         #[cfg(feature = "gxx")]
-        "cpp.gxx" => Ok(Box::new(cpp_gxx::CppGxx::new())),
+        "cpp.gxx" => Ok(cpp_gxx::CppGxx::compile),
+
         _ => Err("Language or compiler is not support"),
     }
 }
@@ -44,8 +47,8 @@ mod tests {
         let source_file = work_dir.path().join("c_compile_test.c");
         fs::write(&source_file, "#include<stdio.h>\nint main() { return 0; }")
             .expect("Failed to write source code");
-        let compiler = get_compiler("c.gcc").unwrap();
-        let compile_success = compiler.compile(&source_file, &executable_file);
+        let compile = get_compiler("c.gcc").unwrap();
+        let compile_success = compile(&source_file, &executable_file);
         assert!(compile_success);
         assert!(process::Command::new(&executable_file).status()?.success());
         Ok(())
@@ -59,8 +62,8 @@ mod tests {
         let source_file = work_dir.path().join("cpp_compile_test.cpp");
         fs::write(&source_file, "#include<iostream>\nint main() { return 0; }")
             .expect("Failed to write source code");
-        let compiler = get_compiler("cpp.gxx").unwrap();
-        let compile_success = compiler.compile(&source_file, &executable_file);
+        let compile = get_compiler("cpp.gxx").unwrap();
+        let compile_success = compile(&source_file, &executable_file);
         assert!(compile_success);
         assert!(process::Command::new(&executable_file).status()?.success());
         Ok(())

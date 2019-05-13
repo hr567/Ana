@@ -1,16 +1,16 @@
+/// A high performance framework for building judge system
 use std::iter;
 use std::path;
 use std::time;
 
 use log::*;
-use tokio::prelude::*;
-use tokio_threadpool;
 
 pub mod communicator;
 pub mod compiler;
 pub mod diff;
 pub mod mtp;
 pub mod runner;
+pub mod threadpool;
 pub mod workspace;
 
 use communicator::*;
@@ -22,16 +22,8 @@ pub struct Ana<T: Receiver, U: Sender> {
     report_sender: ReportSender<U>,
 }
 
-impl<T, U> Ana<T, U>
-where
-    T: Receiver + Send + 'static,
-    U: Sender + Send + 'static,
-{
-    pub fn new(
-        max_threads: usize,
-        task_receiver: impl Into<TaskReceiver<T>>,
-        report_sender: impl Into<ReportSender<U>>,
-    ) -> Ana<T, U> {
+impl<T: Receiver + Send + 'static, U: Sender + Send + 'static> Ana<T, U> {
+    pub fn new(max_threads: usize, task_receiver: T, report_sender: U) -> Ana<T, U> {
         Ana {
             max_threads,
             task_receiver: task_receiver.into(),
@@ -46,31 +38,25 @@ where
             report_sender,
         } = self;
 
-        let pool = tokio_threadpool::Builder::new()
-            .pool_size(max_threads)
-            .build();
+        let thread_pool = threadpool::ThreadPool::new(max_threads);
 
-        let server = task_receiver
-            .map_err(|e| match e {
-                communicator::Error::Network => panic!("Network error"),
-                communicator::Error::Data => panic!("Data error"),
-                communicator::Error::EOF => unreachable!("EOF should not appear here"),
-            })
-            .for_each(move |judge_task| {
-                let sender = report_sender.clone();
-                debug!("Received judge information: {:?}", &judge_task);
-                pool.spawn(future::lazy(move || {
-                    for judge_report in judge(judge_task) {
-                        sender
-                            .send(judge_report)
-                            .expect("Failed to send judge report");
-                    }
-                    Ok(())
-                }));
-                Ok(())
+        loop {
+            let judge_task = match task_receiver.receive() {
+                Ok(task) => task,
+                Err(communicator::Error::Network) => panic!("Network error"),
+                Err(communicator::Error::Data) => panic!("Data error"),
+                Err(communicator::Error::EOF) => break,
+            };
+
+            let report_sender = report_sender.clone();
+            thread_pool.spawn(move || {
+                for judge_report in judge(judge_task) {
+                    report_sender
+                        .send(judge_report)
+                        .expect("Failed to send judge report");
+                }
             });
-
-        tokio::run(server);
+        }
     }
 }
 
@@ -103,28 +89,26 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
     };
     debug!("[Done] Compiling source code");
 
+    if !compile_success {
+        let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
+        return Box::new(iter::once(ce_report));
+    }
+
     match problem {
         mtp::Problem::Normal {
             time_limit,
             memory_limit,
             ..
         } => {
-            if !compile_success {
-                let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
-                return Box::new(iter::once(ce_report));
-            }
-
             let time_limit = time::Duration::from_nanos(time_limit);
             let memory_limit = memory_limit as usize;
 
-            let mut test_cases = work_dir
+            let reports = work_dir
                 .problem_dir()
                 .test_case_dirs()
                 .into_iter()
-                .enumerate();
-
-            Box::new(iter::from_fn(move || {
-                if let Some((index, test_case_dir)) = test_cases.next() {
+                .enumerate()
+                .map(move |(index, test_case_dir)| {
                     debug!("Testing test case #{}", index);
                     let runner_report = runner::run(
                         Some(work_dir.runtime_dir()),
@@ -133,9 +117,7 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
                         test_case_dir.output_file(),
                         time_limit,
                         memory_limit,
-                    )
-                    .wait()
-                    .expect("Failed to run compiled program");
+                    );
                     let report = generate_normal_problem_report(
                         &id,
                         time_limit,
@@ -145,11 +127,9 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
                         runner_report,
                     );
                     debug!("[#{}] Generated report: {:?}", index, &report);
-                    Some(report)
-                } else {
-                    None
-                }
-            }))
+                    report
+                });
+            Box::new(reports)
         }
         mtp::Problem::Special {
             time_limit,
@@ -157,11 +137,6 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
             spj,
             ..
         } => {
-            if !compile_success {
-                let ce_report = mtp::JudgeReport::new(&id, 0, mtp::JudgeResult::CE, 0, 0);
-                return Box::new(iter::once(ce_report));
-            }
-
             let time_limit = time::Duration::from_nanos(time_limit);
             let memory_limit = memory_limit as usize;
 
@@ -178,14 +153,12 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
             };
             assert!(spj_compile_success, "Failed to compile spj");
 
-            let mut test_cases = work_dir
+            let reports = work_dir
                 .problem_dir()
                 .test_case_dirs()
                 .into_iter()
-                .enumerate();
-
-            Box::new(iter::from_fn(move || {
-                if let Some((index, test_case_dir)) = test_cases.next() {
+                .enumerate()
+                .map(move |(index, test_case_dir)| {
                     debug!("Testing test case #{}", index);
                     let runner_report = runner::run(
                         Some(work_dir.runtime_dir()),
@@ -194,9 +167,7 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
                         test_case_dir.output_file(),
                         time_limit,
                         memory_limit,
-                    )
-                    .wait()
-                    .expect("Failed to run compiled program");
+                    );
                     let report = generate_special_judge_problem_report(
                         &id,
                         time_limit,
@@ -206,11 +177,9 @@ fn judge(judge_task: mtp::JudgeTask) -> Box<dyn iter::Iterator<Item = mtp::Judge
                         runner_report,
                     );
                     debug!("[#{}] Generated report: {:?}", index, &report);
-                    Some(report)
-                } else {
-                    None
-                }
-            }))
+                    report
+                });
+            Box::new(reports)
         }
     }
 }

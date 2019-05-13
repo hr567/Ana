@@ -10,6 +10,8 @@ use tempfile;
 
 use crate::mtp;
 
+const BYTES_PER_MB: usize = 1024 * 1024;
+
 pub struct Workspace {
     inner: tempfile::TempDir,
 }
@@ -31,6 +33,13 @@ impl Default for Workspace {
             .mount()
             .expect("Failed to mount tmpfs on workspace");
 
+        fs::create_dir(&workspace.runtime_dir()).expect("Failed to create runtime directory");
+        libmount::Tmpfs::new(&workspace.runtime_dir())
+            .size_bytes(32 * BYTES_PER_MB)
+            .mode(0o700)
+            .mount()
+            .expect("Failed to mount tmpfs on runtime directory");
+
         workspace
     }
 }
@@ -43,6 +52,7 @@ impl AsRef<path::Path> for Workspace {
 
 impl Drop for Workspace {
     fn drop(&mut self) {
+        nix::mount::umount(self.runtime_dir().as_ref()).unwrap();
         nix::mount::umount(self.inner.path()).unwrap();
     }
 }
@@ -95,7 +105,6 @@ impl WorkDir for Workspace {
 
     fn prepare_judge_task(&self, judge_task: &mtp::JudgeTask) {
         fs::create_dir(self.problem_dir()).unwrap();
-        fs::create_dir(self.runtime_dir()).unwrap();
         fs::write(self.source_file(), &judge_task.source.code).unwrap();
         self.problem_dir().prepare_problem(&judge_task.problem);
     }

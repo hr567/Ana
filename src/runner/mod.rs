@@ -1,3 +1,5 @@
+/// Program runner with resource limit
+/// and system call filter
 use std::ffi;
 use std::fs;
 use std::io;
@@ -12,19 +14,30 @@ use std::os::unix::{
 
 use caps;
 use nix;
-use tokio::prelude::*;
-use tokio_threadpool;
 
 mod cgroup;
 mod seccomp;
 
+/// Report the runner return
 #[derive(Debug)]
 pub struct RunnerReport {
+    /// set to `true` if the program exit with code zero and
+    /// set to `false` if exited with non-zero code or be killed
     pub exit_success: bool,
+
+    /// time the program use in real world
     pub real_time_usage: time::Duration,
+
+    /// cpu time the program use
     pub cpu_time_usage: time::Duration,
+
+    /// memory the program use
     pub memory_usage: usize,
+
+    /// set to `true` if the program timeout
     pub tle_flag: bool,
+
+    /// set to `true` if the program use too many memory
     pub mle_flag: bool,
 }
 
@@ -35,31 +48,32 @@ pub fn run(
     output_file: impl AsRef<path::Path>,
     time_limit: time::Duration,
     memory_limit: usize,
-) -> impl Future<Item = RunnerReport, Error = ()> {
-    let cg = cgroup::Cgroup::new(time_limit, memory_limit);
-
+) -> RunnerReport {
     match nix::unistd::fork().expect("Failed to fork a child process") {
         nix::unistd::ForkResult::Parent { child: pid } => {
+            let start_time = time::Instant::now();
+
+            let cg = cgroup::Cgroup::new(time_limit, memory_limit);
             cg.add_process(pid);
 
             thread::spawn(move || {
-                let start_time = time::Instant::now();
-                while start_time.elapsed() < time_limit * 2 {
-                    thread::sleep(time_limit / 2);
-                }
-                nix::sys::signal::kill(pid, nix::sys::signal::SIGKILL).unwrap_or_else(|e| {
-                    assert_eq!(
-                        e,
-                        nix::Error::Sys(nix::errno::Errno::ESRCH),
-                        "Failed to kill long running child process"
-                    );
-                });
+                thread::sleep(time_limit * 2);
+                nix::sys::signal::kill(pid, nix::sys::signal::SIGKILL).unwrap_or_default();
             });
 
-            RunnerFuture {
-                cg,
-                pid,
-                start_time: time::Instant::now(),
+            RunnerReport {
+                exit_success: match nix::sys::wait::waitpid(pid, None)
+                    .expect("Failed to wait child process to exit")
+                {
+                    nix::sys::wait::WaitStatus::Exited(_, code) => code == 0,
+                    nix::sys::wait::WaitStatus::Signaled(_, _, _) => false,
+                    _ => unreachable!("Should not appear other cases"),
+                },
+                real_time_usage: start_time.elapsed(),
+                cpu_time_usage: cg.get_cpu_time_usage(),
+                memory_usage: cg.get_memory_usage(),
+                tle_flag: cg.is_time_limit_exceeded(),
+                mle_flag: cg.is_memory_limit_exceeded(),
             }
         }
 
@@ -152,42 +166,6 @@ pub fn run(
                 .expect("Failed to exec child process");
 
             unreachable!("Not reachable after exec")
-        }
-    }
-}
-
-pub struct RunnerFuture {
-    cg: cgroup::Cgroup,
-    pid: nix::unistd::Pid,
-    start_time: time::Instant,
-}
-
-unsafe impl Send for RunnerFuture {}
-
-impl Future for RunnerFuture {
-    type Item = RunnerReport;
-    type Error = ();
-    fn poll(&mut self) -> Poll<RunnerReport, ()> {
-        match tokio_threadpool::blocking(|| {
-            nix::sys::wait::waitpid(self.pid, None).expect("Failed to wait child process to exit")
-        }) {
-            Ok(Async::Ready(status)) => {
-                let res = RunnerReport {
-                    exit_success: match status {
-                        nix::sys::wait::WaitStatus::Exited(_, code) => code == 0,
-                        nix::sys::wait::WaitStatus::Signaled(_, _, _) => false,
-                        _ => unreachable!("Should not appear other cases"),
-                    },
-                    real_time_usage: self.start_time.elapsed(),
-                    cpu_time_usage: self.cg.get_cpu_time_usage(),
-                    memory_usage: self.cg.get_memory_usage(),
-                    tle_flag: self.cg.is_time_limit_exceeded(),
-                    mle_flag: self.cg.is_memory_limit_exceeded(),
-                };
-                Ok(Async::Ready(res))
-            }
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(_) => Err(()),
         }
     }
 }

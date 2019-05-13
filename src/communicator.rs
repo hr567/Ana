@@ -1,7 +1,7 @@
+/// Simple traits for communicate between server and client
 use std::sync::{Arc, Mutex};
 
 use crate::mtp;
-use tokio::prelude::*;
 
 pub const EOF: &str = "EOF";
 
@@ -14,9 +14,8 @@ pub enum Error {
 
 /// The `Receiver` trait allows for receiving judge task
 pub trait Receiver {
-    /// Receive a JudgeTask
-    /// This method should block current thread until
-    /// it receive a judge task and then return it.
+    /// Block the current thread and then
+    /// receive a judge task.
     fn receive(&self) -> Result<mtp::JudgeTask, Error>;
 }
 
@@ -26,6 +25,7 @@ pub trait Sender {
     fn send(&self, report: mtp::JudgeReport) -> Result<(), Error>;
 }
 
+/// A wrapper for task receiver which implemented Stream trait.
 pub struct TaskReceiver<T: Receiver>(T);
 
 impl<T: Receiver> Receiver for TaskReceiver<T> {
@@ -40,22 +40,8 @@ impl<T: Receiver> From<T> for TaskReceiver<T> {
     }
 }
 
-impl<T: Receiver> Stream for TaskReceiver<T> {
-    type Item = mtp::JudgeTask;
-    type Error = Error;
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match tokio_threadpool::blocking(|| self.receive())
-            .expect("Panic when trying to receive a task")
-        {
-            Async::Ready(Ok(res)) => Ok(Async::Ready(Some(res))),
-            Async::Ready(Err(Error::Data)) => Err(Error::Data),
-            Async::Ready(Err(Error::Network)) => Err(Error::Network),
-            Async::Ready(Err(Error::EOF)) => Ok(Async::Ready(None)),
-            Async::NotReady => Ok(Async::NotReady),
-        }
-    }
-}
-
+/// A wrapper for report receiver.
+/// It is able to be cloned and be sent between threads.
 pub struct ReportSender<T: Sender>(Arc<Mutex<T>>);
 
 impl<T: Sender> Sender for ReportSender<T> {

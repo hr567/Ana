@@ -9,7 +9,7 @@ RUN apt-get update && \
     pkg-config
 COPY . /Ana
 RUN cd /Ana && \
-    cargo build -v
+    cargo build -v --example ana_zmq
 
 FROM ubuntu:18.04
 RUN apt-get update && \
@@ -19,7 +19,7 @@ RUN apt-get update && \
     gcc \
     g++ && \
     apt-get clean
-COPY --from=build /Ana/target/debug/ana /usr/local/bin
+COPY --from=build /Ana/target/debug/examples/ana_zmq /usr/local/bin/ana
 ENV RUST_BACKTRACE=1
 ENV RUST_LOG=debug
 EXPOSE 8800 8801
