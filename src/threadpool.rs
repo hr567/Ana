@@ -19,8 +19,8 @@ impl ThreadPool {
                 .expect("Failed to send new thread worker");
         }
 
-        thread::spawn(move || loop {
-            for task in task_receiver.recv() {
+        thread::spawn(move || {
+            for task in task_receiver {
                 worker_receiver
                     .recv()
                     .expect("Failed to get new worker")
@@ -28,9 +28,7 @@ impl ThreadPool {
             }
         });
 
-        ThreadPool {
-            task_sender: task_sender,
-        }
+        ThreadPool { task_sender }
     }
 
     pub fn spawn(&self, task: impl FnOnce() + Send + 'static) {
@@ -60,14 +58,14 @@ impl Worker {
 }
 
 trait FnBox {
-    fn call_box(self: Box<Self>) -> ();
+    fn call_box(self: Box<Self>);
 }
 
 impl<T> FnBox for T
 where
     T: FnOnce(),
 {
-    fn call_box(self: Box<Self>) -> () {
+    fn call_box(self: Box<Self>) {
         (*self)()
     }
 }
