@@ -5,9 +5,9 @@ use std::time;
 
 use log::*;
 
+pub mod checker;
 pub mod communicator;
 pub mod compiler;
-pub mod diff;
 pub mod mtp;
 pub mod runner;
 pub mod threadpool;
@@ -216,7 +216,10 @@ fn generate_normal_problem_report(
         mtp::JudgeResult::TLE
     } else if !exit_success {
         mtp::JudgeResult::RE
-    } else if diff::check(&case_dir.output_file(), &case_dir.answer_file()).unwrap_or(false) {
+    } else if checker::Checker::default()
+        .compare_files(&case_dir.output_file(), &case_dir.answer_file())
+        .unwrap_or(false)
+    {
         mtp::JudgeResult::AC
     } else {
         mtp::JudgeResult::WA
@@ -255,13 +258,14 @@ fn generate_special_judge_problem_report(
         mtp::JudgeResult::TLE
     } else if !exit_success {
         mtp::JudgeResult::RE
-    } else if diff::check_with_spj(
-        &case_dir.input_file(),
-        &case_dir.output_file(),
-        &case_dir.answer_file(),
-        &problem_dir.spj_file(),
-    )
-    .unwrap_or(false)
+    } else if checker::Checker::default()
+        .extern_program(&problem_dir.spj_file())
+        .check_use_extern_program(
+            &case_dir.input_file(),
+            &case_dir.output_file(),
+            &case_dir.answer_file(),
+        )
+        .unwrap_or(false)
     {
         mtp::JudgeResult::AC
     } else {
