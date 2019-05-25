@@ -1,9 +1,8 @@
-// FIXME: Use FnBox API for rust above 1.35
 use std::sync;
 use std::thread;
 
 pub struct ThreadPool {
-    task_sender: sync::mpsc::Sender<Box<dyn FnBox + Send + 'static>>,
+    task_sender: sync::mpsc::Sender<Box<dyn FnOnce() + Send + 'static>>,
 }
 
 impl ThreadPool {
@@ -11,7 +10,8 @@ impl ThreadPool {
         assert!(size > 0, "Thread pool must has as least 1 worker");
 
         let (worker_sender, worker_receiver) = sync::mpsc::channel::<Worker>();
-        let (task_sender, task_receiver) = sync::mpsc::channel::<Box<dyn FnBox + Send + 'static>>();
+        let (task_sender, task_receiver) =
+            sync::mpsc::channel::<Box<dyn FnOnce() + Send + 'static>>();
 
         for _ in 0..size {
             worker_sender
@@ -47,25 +47,12 @@ impl Worker {
         Worker { sender }
     }
 
-    fn spawn(self, func: Box<dyn FnBox + Send + 'static>) {
+    fn spawn(self, func: Box<dyn FnOnce() + Send + 'static>) {
         thread::spawn(move || {
-            func.call_box();
+            func();
             self.sender
                 .send(Worker::new(self.sender.clone()))
                 .unwrap_or_default();
         });
-    }
-}
-
-trait FnBox {
-    fn call_box(self: Box<Self>);
-}
-
-impl<T> FnBox for T
-where
-    T: FnOnce(),
-{
-    fn call_box(self: Box<Self>) {
-        (*self)()
     }
 }
