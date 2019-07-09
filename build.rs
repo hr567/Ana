@@ -1,18 +1,18 @@
-use bindgen;
+use std::path::Path;
+
+use protoc_grpcio;
 
 fn main() {
-    println!("cargo:rustc-link-lib=dylib=seccomp");
-    let seccomp_bindings = bindgen::builder()
-        .header_contents("seccomp_wrapper.h", "#include<seccomp.h>")
-        // .whitelist_function("seccomp_init")
-        // .whitelist_function("seccomp_rule_add")
-        // .whitelist_function("seccomp_load")
-        // .whitelist_function("seccomp_release")
-        // .whitelist_function("seccomp_syscall_resolve_name")
-        .generate()
-        .expect("Failed to generate seccomp bindings");
+    build_proto();
+}
 
-    seccomp_bindings
-        .write_to_file("src/runner/seccomp/warpper.rs")
-        .expect("Failed to write to seccomp ffi file");
+fn build_proto() {
+    let proto_root = Path::new("src/rpc");
+    protoc_grpcio::compile_grpc_protos(
+        &[proto_root.join("rpc.proto")],
+        &[&proto_root],
+        &proto_root,
+        None,
+    )
+    .expect("Failed to compile proto");
 }

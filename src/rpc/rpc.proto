@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+service Ana {
+  rpc Judge(Task) returns (stream Report) {}
+}
+
+message Task {
+  Source source = 1;
+  Problem problem = 2;
+}
+
+message Report {
+  enum Result {
+    Accepted = 0;
+    WrongAnswer = 1;
+    TimeLimitExceeded = 2;
+    MemoryLimitExceeded = 3;
+    RuntimeError = 4;
+    CompileError = 5;
+    SystemError = 6;
+  }
+  Result result = 1;
+  Resource usage = 2;
+  string message = 3;
+}
+
+message Problem {
+  oneof problem {
+    NormalProblem normal = 1;
+    SpecialProblem special = 2;
+  }
+}
+
+message NormalProblem {
+  Resource limit = 1;
+  repeated TestCase cases = 2;
+}
+
+message SpecialProblem {
+  Resource limit = 1;
+  repeated TestCase cases = 2;
+  Source spj = 3;
+}
+
+message TestCase {
+  string input = 1;
+  string answer = 2;
+}
+
+message Source {
+  string language = 1;
+  string code = 2;
+}
+
+message Resource {
+  uint64 real_time = 1; // Nanoseconds
+  uint64 cpu_time = 2;  // Nanoseconds
+  uint64 memory = 3;    // Bytes
+}

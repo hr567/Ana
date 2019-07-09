@@ -1,104 +1,86 @@
 mod common;
 use common::*;
 
-const PROBLEM: &str = "example/spj_problem_1.json";
+use std::time::Duration;
+
+use liboj::structures::Report;
+
+const PROBLEM: &str = "example_data/spj_problem_1.json";
 
 #[test]
-fn test_spj_1_with_ac() {
-    let judge_task = generate_judge_task(SOURCE_AC, PROBLEM);
-    let judge = Judge::new("test_special_judge_1_with_ac");
-    judge.send_judge(&judge_task);
-    for _i in 0..judge_task.problem.len() {
-        let report = judge.receive_report();
-        assert_report_with_limit(
-            &report.into(),
-            &judge_task.id,
-            "AC",
-            (1.0 * NS_PER_SEC) as u64,
-            (32.0 * BYTES_PER_MB) as u64,
-        );
+fn test_spj_0_with_ac() {
+    let task = generate_judge_task(SOURCE_AC, PROBLEM);
+    let judge = Judge::new();
+    for report in judge.judge(task) {
+        match report {
+            Report::Accepted {
+                resource_usage: usage,
+            } => {
+                assert!(usage.real_time < Duration::from_secs(1) * 2);
+                assert!(usage.cpu_time < Duration::from_secs(1));
+                assert!(usage.memory < 32 * BYTES_PER_MB);
+            }
+            res => panic!("Wrong judge result: {}", res),
+        }
     }
 }
 
 #[test]
-fn test_spj_1_with_ce() {
-    let judge_task = generate_judge_task(SOURCE_CE, PROBLEM);
-    let judge = Judge::new("test_special_judge_1_with_ce");
-    judge.send_judge(&judge_task);
-    let report = judge.receive_report();
-    assert_report_with_limit(
-        &report.into(),
-        &judge_task.id,
-        "CE",
-        (1.0 * NS_PER_SEC) as u64,
-        (32.0 * BYTES_PER_MB) as u64,
-    );
-}
-
-#[test]
-fn test_spj_1_with_mle() {
-    let judge_task = generate_judge_task(SOURCE_MLE, PROBLEM);
-    let judge = Judge::new("test_special_judge_1_with_mle");
-    judge.send_judge(&judge_task);
-    for _i in 0..judge_task.problem.len() {
-        let report = judge.receive_report();
-        assert_report_with_limit(
-            &report.into(),
-            &judge_task.id,
-            "MLE",
-            (1.0 * NS_PER_SEC) as u64,
-            (32.0 * MEMORY_EPS * BYTES_PER_MB) as u64,
-        );
+fn test_spj_0_with_ce() {
+    let task = generate_judge_task(SOURCE_CE, PROBLEM);
+    let judge = Judge::new();
+    for report in judge.judge(task) {
+        match report {
+            Report::CompileError => {}
+            res => panic!("Wrong judge result: {}", res),
+        }
     }
 }
 
 #[test]
-fn test_spj_1_with_re() {
-    let judge_task = generate_judge_task(SOURCE_RE, PROBLEM);
-    let judge = Judge::new("test_special_judge_1_with_re");
-    judge.send_judge(&judge_task);
-    for _i in 0..judge_task.problem.len() {
-        let report = judge.receive_report();
-        assert_report_with_limit(
-            &report.into(),
-            &judge_task.id,
-            "RE",
-            (1.0 * NS_PER_SEC) as u64,
-            (32.0 * BYTES_PER_MB) as u64,
-        );
+fn test_spj_0_with_mle() {
+    let task = generate_judge_task(SOURCE_MLE, PROBLEM);
+    let judge = Judge::new();
+    for report in judge.judge(task) {
+        match report {
+            Report::MemoryLimitExceeded => {}
+            res => panic!("Wrong judge result: {}", res),
+        }
     }
 }
 
 #[test]
-fn test_spj_1_with_tle() {
-    let judge_task = generate_judge_task(SOURCE_TLE, PROBLEM);
-    let judge = Judge::new("test_special_judge_1_with_tle");
-    judge.send_judge(&judge_task);
-    for _i in 0..judge_task.problem.len() {
-        let report = judge.receive_report();
-        assert_report_with_limit(
-            &report.into(),
-            &judge_task.id,
-            "TLE",
-            (1.0 * TIME_EPS * NS_PER_SEC) as u64,
-            (32.0 * BYTES_PER_MB) as u64,
-        );
+fn test_spj_0_with_re() {
+    let task = generate_judge_task(SOURCE_RE, PROBLEM);
+    let judge = Judge::new();
+    for report in judge.judge(task) {
+        match report {
+            Report::RuntimeError => {}
+            res => panic!("Wrong judge result: {}", res),
+        }
     }
 }
 
 #[test]
-fn test_spj_1_with_wa() {
-    let judge_task = generate_judge_task(SOURCE_WA, PROBLEM);
-    let judge = Judge::new("test_special_judge_1_with_wa");
-    judge.send_judge(&judge_task);
-    for _i in 0..judge_task.problem.len() {
-        let report = judge.receive_report();
-        assert_report_with_limit(
-            &report.into(),
-            &judge_task.id,
-            "WA",
-            (1.0 * NS_PER_SEC) as u64,
-            (32.0 * BYTES_PER_MB) as u64,
-        );
+fn test_spj_0_with_tle() {
+    let task = generate_judge_task(SOURCE_TLE, PROBLEM);
+    let judge = Judge::new();
+    for report in judge.judge(task) {
+        match report {
+            Report::TimeLimitExceeded => {}
+            res => panic!("Wrong judge result: {}", res),
+        }
+    }
+}
+
+#[test]
+fn test_spj_0_with_wa() {
+    let task = generate_judge_task(SOURCE_WA, PROBLEM);
+    let judge = Judge::new();
+    for report in judge.judge(task) {
+        match report {
+            Report::WrongAnswer => {}
+            res => panic!("Wrong judge result: {}", res),
+        }
     }
 }

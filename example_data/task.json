@@ -1,7 +1,6 @@
 {
-    "id": "",
     "source": {
-        "language": "cpp.gxx",
+        "language": "cpp.g++",
         "code": ""
     },
     "problem": {}

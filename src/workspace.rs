@@ -3,17 +3,18 @@
 /// TODO: Use fuse rewrite in the future for
 /// better performance and less memory usage
 use std::fs;
-use std::path;
+use std::io;
+use std::path::{Path, PathBuf};
 
-use libmount;
-use tempfile;
-
-use crate::mtp;
+use libmount::Tmpfs;
+use liboj::structures::*;
+use nix::mount::umount;
+use tempfile::{tempdir, TempDir};
 
 const BYTES_PER_MB: usize = 1024 * 1024;
 
 pub struct Workspace {
-    inner: tempfile::TempDir,
+    inner: TempDir,
 }
 
 impl Workspace {
@@ -25,16 +26,16 @@ impl Workspace {
 impl Default for Workspace {
     fn default() -> Workspace {
         let workspace = Workspace {
-            inner: tempfile::tempdir().expect("Failed to create a temp dir"),
+            inner: tempdir().expect("Failed to create a temp dir"),
         };
 
-        libmount::Tmpfs::new(&workspace)
+        Tmpfs::new(&workspace)
             .mode(0o700)
             .mount()
             .expect("Failed to mount tmpfs on workspace");
 
         fs::create_dir(&workspace.runtime_dir()).expect("Failed to create runtime directory");
-        libmount::Tmpfs::new(&workspace.runtime_dir())
+        Tmpfs::new(&workspace.runtime_dir())
             .size_bytes(32 * BYTES_PER_MB)
             .mode(0o700)
             .mount()
@@ -44,79 +45,80 @@ impl Default for Workspace {
     }
 }
 
-impl AsRef<path::Path> for Workspace {
-    fn as_ref(&self) -> &path::Path {
+impl AsRef<Path> for Workspace {
+    fn as_ref(&self) -> &Path {
         self.inner.path()
     }
 }
 
 impl Drop for Workspace {
     fn drop(&mut self) {
-        nix::mount::umount(self.runtime_dir().as_ref()).unwrap();
-        nix::mount::umount(self.inner.path()).unwrap();
+        umount(self.runtime_dir().as_path()).unwrap();
+        umount(self.inner.path()).unwrap();
     }
 }
 
 pub trait WorkDir {
-    fn source_file(&self) -> Box<path::Path>;
-    fn problem_dir(&self) -> Box<path::Path>;
-    fn runtime_dir(&self) -> Box<path::Path>;
+    fn source_file(&self) -> PathBuf;
+    fn problem_dir(&self) -> PathBuf;
+    fn runtime_dir(&self) -> PathBuf;
 
-    fn prepare_judge_task(&self, judge_task: &mtp::JudgeTask);
+    fn prepare_task(&self, task: &Task) -> io::Result<()>;
 }
 
 pub trait RuntimeDir {
-    fn executable_file(&self) -> Box<path::Path>;
+    fn executable_file(&self) -> PathBuf;
 }
 
 pub trait ProblemDir {
-    fn test_case_dirs(&self) -> Vec<Box<path::Path>>;
+    fn test_case_dirs(&self) -> Vec<PathBuf>;
 
-    fn prepare_problem(&self, problem: &mtp::Problem);
+    fn prepare_problem(&self, problem: &Problem) -> io::Result<()>;
 }
 
 pub trait SpecialJudgeProblemDir: ProblemDir {
-    fn spj_file(&self) -> Box<path::Path>;
-    fn spj_source(&self) -> Box<path::Path>;
+    fn spj_file(&self) -> PathBuf;
+    fn spj_source(&self) -> PathBuf;
 
-    fn prepare_special_judge_problem(&self, problem: &mtp::Problem);
+    fn prepare_special_judge_problem(&self, problem: &Problem) -> io::Result<()>;
 }
 
 pub trait TestCaseDir {
-    fn input_file(&self) -> Box<path::Path>;
-    fn output_file(&self) -> Box<path::Path>;
-    fn answer_file(&self) -> Box<path::Path>;
+    fn input_file(&self) -> PathBuf;
+    fn output_file(&self) -> PathBuf;
+    fn answer_file(&self) -> PathBuf;
 
-    fn prepare_test_case(&self, test_case: &mtp::TestCase);
+    fn prepare_test_case(&self, test_case: &TestCase) -> io::Result<()>;
 }
 
 impl WorkDir for Workspace {
-    fn source_file(&self) -> Box<path::Path> {
-        self.inner.path().join("source").into_boxed_path()
+    fn source_file(&self) -> PathBuf {
+        self.inner.path().join("source")
     }
 
-    fn problem_dir(&self) -> Box<path::Path> {
-        self.inner.path().join("problem").into_boxed_path()
+    fn problem_dir(&self) -> PathBuf {
+        self.inner.path().join("problem")
     }
 
-    fn runtime_dir(&self) -> Box<path::Path> {
-        self.inner.path().join("runtime").into_boxed_path()
+    fn runtime_dir(&self) -> PathBuf {
+        self.inner.path().join("runtime")
     }
 
-    fn prepare_judge_task(&self, judge_task: &mtp::JudgeTask) {
-        fs::create_dir(self.problem_dir()).unwrap();
-        fs::write(self.source_file(), &judge_task.source.code).unwrap();
-        self.problem_dir().prepare_problem(&judge_task.problem);
+    fn prepare_task(&self, task: &Task) -> io::Result<()> {
+        fs::create_dir(self.problem_dir())?;
+        fs::write(self.source_file(), &task.source.code)?;
+        self.problem_dir().prepare_problem(&task.problem)?;
+        Ok(())
     }
 }
 
-impl ProblemDir for path::Path {
-    fn test_case_dirs(&self) -> Vec<Box<path::Path>> {
+impl ProblemDir for Path {
+    fn test_case_dirs(&self) -> Vec<PathBuf> {
         let mut res = Vec::new();
         for i in 0.. {
             let test_case_dir = self.join(i.to_string());
             if test_case_dir.exists() {
-                res.push(test_case_dir.into_boxed_path());
+                res.push(test_case_dir);
             } else {
                 break;
             }
@@ -124,64 +126,67 @@ impl ProblemDir for path::Path {
         res
     }
 
-    fn prepare_problem(&self, problem: &mtp::Problem) {
+    fn prepare_problem(&self, problem: &Problem) -> io::Result<()> {
         match problem {
-            mtp::Problem::Normal { test_cases, .. } => {
-                for (i, test_case) in test_cases.iter().enumerate() {
+            Problem::Normal { cases, .. } => {
+                for (i, test_case) in cases.iter().enumerate() {
                     let test_case_dir = self.join(i.to_string());
-                    fs::create_dir(&test_case_dir).unwrap();
-                    test_case_dir.prepare_test_case(&test_case)
+                    fs::create_dir(&test_case_dir)?;
+                    test_case_dir.prepare_test_case(&test_case)?
                 }
             }
-            mtp::Problem::Special { test_cases, .. } => {
-                self.prepare_special_judge_problem(problem);
-                for (i, test_case) in test_cases.iter().enumerate() {
+            Problem::Special { cases, .. } => {
+                self.prepare_special_judge_problem(problem)?;
+                for (i, test_case) in cases.iter().enumerate() {
                     let test_case_dir = self.join(i.to_string());
-                    fs::create_dir(&test_case_dir).unwrap();
-                    test_case_dir.prepare_test_case(&test_case)
+                    fs::create_dir(&test_case_dir)?;
+                    test_case_dir.prepare_test_case(&test_case)?;
                 }
             }
         }
+        Ok(())
     }
 }
 
-impl SpecialJudgeProblemDir for path::Path {
-    fn spj_file(&self) -> Box<path::Path> {
-        self.join("spj").into_boxed_path()
+impl SpecialJudgeProblemDir for Path {
+    fn spj_file(&self) -> PathBuf {
+        self.join("spj")
     }
 
-    fn spj_source(&self) -> Box<path::Path> {
-        self.join("spj").into_boxed_path()
+    fn spj_source(&self) -> PathBuf {
+        self.join("spj")
     }
 
-    fn prepare_special_judge_problem(&self, problem: &mtp::Problem) {
-        if let mtp::Problem::Special { spj, .. } = problem {
-            fs::write(self.spj_source(), &spj.code).unwrap();
+    fn prepare_special_judge_problem(&self, problem: &Problem) -> io::Result<()> {
+        if let Problem::Special { spj, .. } = problem {
+            fs::write(self.spj_source(), &spj.code)?;
         }
+        Ok(())
     }
 }
 
-impl RuntimeDir for path::Path {
-    fn executable_file(&self) -> Box<path::Path> {
-        self.join("main").into_boxed_path()
+impl RuntimeDir for Path {
+    fn executable_file(&self) -> PathBuf {
+        self.join("main")
     }
 }
 
-impl TestCaseDir for path::Path {
-    fn input_file(&self) -> Box<path::Path> {
-        self.join("input").into_boxed_path()
+impl TestCaseDir for Path {
+    fn input_file(&self) -> PathBuf {
+        self.join("input")
     }
 
-    fn output_file(&self) -> Box<path::Path> {
-        self.join("output").into_boxed_path()
+    fn output_file(&self) -> PathBuf {
+        self.join("output")
     }
 
-    fn answer_file(&self) -> Box<path::Path> {
-        self.join("answer").into_boxed_path()
+    fn answer_file(&self) -> PathBuf {
+        self.join("answer")
     }
 
-    fn prepare_test_case(&self, test_case: &mtp::TestCase) {
-        fs::write(self.input_file(), &test_case.input).unwrap();
-        fs::write(self.answer_file(), &test_case.answer).unwrap();
+    fn prepare_test_case(&self, test_case: &TestCase) -> io::Result<()> {
+        fs::write(self.input_file(), &test_case.input)?;
+        fs::write(self.answer_file(), &test_case.answer)?;
+        Ok(())
     }
 }

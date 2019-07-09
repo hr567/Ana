@@ -2,41 +2,47 @@
 
 [![pipeline status](https://gitlab.com/hr567/Ana/badges/master/pipeline.svg)](https://gitlab.com/hr567/Ana/commits/master)
 
-A open source judge for ACMers in Rust
+A open source judge for ACMers in Rust.
 
 
 ## Requirements
 
 * Rust toolchain (Edition 2018 or higher)
-* ZeroMQ (such as libzmq-dev on Ubuntu)
 
 
 ## Usage
 
+### Run
+
+`cargo run`
+
+Run Ana on the localhost with default configuration.
+
+Needs root permission.
+
+Run `cargo run -- --help` for more information.
+
+### Test
+
 `cargo test`
 
-Please note that testing Ana needs root permission
-to read and write to cgroups.
+Testing Ana needs root permission
+to read and write to cgroups and other functions.
 
 If you find that the time usage is less than time limit
 but the status is TLE, try again with less `judge_threads`.
 
 You can use `cargo test -- --test-threads=1`
-on some computers to avoid some testing mistake.
-
-`cargo run` to run Ana on the localhost.
-Needs root permission too.
-
-Run `cargo run -- --help` for more information.
+on some computers to avoid some testing failures.
 
 
 ## MTP
 
-Ana uses ZeroMQ to communicate with online judge server.
+Ana uses [json](https://www.json.org/) for message transfer.
 
-It uses a PULL and a PUSH to receive and send message.
 The unit of time is ns and the unit of memory is byte.
-A message is a json string and defined as following examples.
+
+Examples:
 
 * Judge
 
@@ -44,7 +50,6 @@ A message is a json string and defined as following examples.
 
   ```json
   {
-    "id": "b6555832ef2111e8bc847470fd3b4381",
     "source": {
       "language": "cpp.gxx",
       "code": "..."
@@ -75,7 +80,6 @@ A message is a json string and defined as following examples.
 
   ```json
   {
-    "id": "b6555832ef2111e8bc847470fd3b4381",
     "source": {
       "language": "cpp.gxx",
       "code": "..."
@@ -109,11 +113,10 @@ A message is a json string and defined as following examples.
 
   ```json
   {
-    "id": "b6555832ef2111e8bc847470fd3b4381",
-    "case_index": 0,
-    "status": "AC",
-    "time": 800000000,
-    "memory": 1258291
+    "index": 0,
+    "result": "AC",
+    "time_usage": 800000000,
+    "memory_usage": 1258291
   }
   ```
 
@@ -145,9 +148,7 @@ workspace
 
 * Recover from errors
 * Limit max concurrent tasks
-* Judge test cases concurrently
 * Add documents
-* Cache problems
 * Use Fuse to reduce memory usage
 
 
