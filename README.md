@@ -18,7 +18,7 @@ A open source judge for ACMers in Rust.
 
 Run Ana on the localhost with default configuration.
 
-Needs root permission.
+Root permission is needed.
 
 Run `cargo run -- --help` for more information.
 
@@ -36,89 +36,13 @@ You can use `cargo test -- --test-threads=1`
 on some computers to avoid some testing failures.
 
 
-## MTP
+# Client
 
-Ana uses [json](https://www.json.org/) for message transfer.
+Ana uses gRPC framework to communicate with client.
+The proto file which has defined the data structures
+and services is located in `src/rpc/rpc.proto`.
 
-The unit of time is ns and the unit of memory is byte.
-
-Examples:
-
-* Judge
-
-  Normal problem:
-
-  ```json
-  {
-    "source": {
-      "language": "cpp.gxx",
-      "code": "..."
-    },
-    "problem": {
-      "type": "Normal",
-      "time_limit": 1000000000,
-      "memory_limit": 33554432,
-      "test_cases": [
-        {
-          "input": "1 1",
-          "answer": "2"
-        },
-        {
-          "input": "13 5\n14 7\n23 45",
-          "answer": "18\n21\n68"
-        },
-        {
-          "input": "24 3\n17 -5\n123 945",
-          "answer": "27\n12\n1068"
-        }
-      ]
-    }
-  }
-  ```
-
-  Problem with special judge:
-
-  ```json
-  {
-    "source": {
-      "language": "cpp.gxx",
-      "code": "..."
-    },
-    "problem": {
-      "type": "Special",
-      "time_limit": 1000000000,
-      "memory_limit": 33554432,
-      "spj": {
-        "language": "cpp.gxx",
-        "code": "..."
-      },
-      "test_cases": [
-        {
-          "input": "1 1",
-          "answer": "2"
-        },
-        {
-          "input": "13 5\n14 7\n23 45",
-          "answer": "18\n21\n68"
-        },
-        {
-          "input": "24 3\n17 -5\n123 945",
-          "answer": "27\n12\n1068"
-        }
-      ]
-    }
-  }
-  ```
-* Report
-
-  ```json
-  {
-    "index": 0,
-    "result": "AC",
-    "time_usage": 800000000,
-    "memory_usage": 1258291
-  }
-  ```
+There is a simple client implementation in `tests/common`.
 
 
 ## Workspace
@@ -147,7 +71,6 @@ workspace
 ## TODOs
 
 * Recover from errors
-* Limit max concurrent tasks
 * Add documents
 * Use Fuse to reduce memory usage
 
