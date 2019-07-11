@@ -1,4 +1,4 @@
-image: rust:slim
+image: rust:latest
 
 stages:
   - test
@@ -6,16 +6,16 @@ stages:
 test:
   stage: test
   script:
-    - export RUST_BACKTRACE=1
-    # - export RUST_LOG=debug
-    - apt-get update
-    - apt-get install -y
-      libzmq3-dev
-      pkg-config
-      libseccomp-dev
-      llvm-dev
-      libclang-dev
-      clang
-      gcc
-      g++
-    - cargo test --tests --no-fail-fast -- --test-threads=1
+  - export RUST_BACKTRACE=1
+  # - export RUST_LOG=debug
+  - apt-get update
+  - apt-get install -y
+    protobuf-compiler
+    libseccomp-dev
+    llvm-dev
+    libclang-dev
+    clang
+    cmake
+    gcc
+    g++
+  - cargo test -- --test-threads=1
