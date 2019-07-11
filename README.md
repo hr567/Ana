@@ -18,10 +18,9 @@ A open source judge for ACMers in Rust.
 
 `cargo run`
 
-Run Ana on the localhost with default configuration.
+Run Ana on the localhost with the default configuration.
 
-Root permission is needed. If you try to run Ana in
-docker container, you must pass `--privileged` to docker.
+**Root permission is needed.**
 
 Run `cargo run -- --help` for more information.
 
@@ -33,14 +32,30 @@ Testing Ana needs root permission to
 read and write to cgroups and
 implement some other functions.
 
-If you find that the time usage is less than time limit
-but the status is TLE, try again with less `judge_threads`.
+If you find that the time usage is less than
+the time limit but the status is TLE,
+try again with less `judge_threads`.
 
 
-# Client
+### Docker
 
-Ana uses gRPC framework to communicate with client.
-The proto file which has defined the data structures
+It is highly recommended to run Ana in a Docker container.
+Start an Ana server in the background by following commands: \
+`docker run --privileged -d hr567/ana run`
+
+And you can also use other commands, use \
+`docker run --privileged hr567/ana --help` \
+or \
+`docker run --privileged hr567/ana -- --help`
+
+for more information and see
+all supported commands and configurations.
+
+
+## Client
+
+Ana uses gRPC framework to communicate with the client.
+The protobuf file which has defined the data structures
 and services is located in `src/rpc/rpc.proto`.
 
 There is a simple client implementation in `tests/common`.
@@ -78,5 +93,5 @@ workspace
 
 ## License
 
-Ana is published under MIT licence,
+Ana is published under MIT license,
 see "[LICENSE](LICENSE)" for more information.
