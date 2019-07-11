@@ -8,6 +8,8 @@ A open source judge for ACMers in Rust.
 ## Requirements
 
 * Rust toolchain (Edition 2018 or higher)
+* Protobuf (Dev files and protobuf-compiler)
+* libseccomp
 
 
 ## Usage
@@ -18,22 +20,21 @@ A open source judge for ACMers in Rust.
 
 Run Ana on the localhost with default configuration.
 
-Root permission is needed.
+Root permission is needed. If you try to run Ana in
+docker container, you must pass `--privileged` to docker.
 
 Run `cargo run -- --help` for more information.
 
 ### Test
 
-`cargo test`
+`cargo test -- --test-threads=1`
 
-Testing Ana needs root permission
-to read and write to cgroups and other functions.
+Testing Ana needs root permission to
+read and write to cgroups and
+implement some other functions.
 
 If you find that the time usage is less than time limit
 but the status is TLE, try again with less `judge_threads`.
-
-You can use `cargo test -- --test-threads=1`
-on some computers to avoid some testing failures.
 
 
 # Client
