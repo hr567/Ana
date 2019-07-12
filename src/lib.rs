@@ -53,7 +53,6 @@ fn judge(task: Task) -> Box<dyn Iterator<Item = Report> + Send> {
     let Source { language, .. } = &source;
     let compile_success = Compiler::new(&language)
         .expect("The language is not support")
-        .expect("Failed to read config for the language")
         .compile(&source, &work_dir.runtime_dir().executable_file())
         .expect("Failed to run compiler");
 
@@ -90,7 +89,6 @@ fn judge(task: Task) -> Box<dyn Iterator<Item = Report> + Send> {
                 let Source { language, .. } = &spj;
                 Compiler::new(&language)
                     .expect("The language is not support")
-                    .expect("Failed to read config for the language")
                     .compile(&spj, &work_dir.problem_dir().spj_file())
                     .expect("Failed to run compiler")
             };

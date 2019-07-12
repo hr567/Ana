@@ -1,5 +1,5 @@
-use std::io::{self, prelude::*};
 use std::net::IpAddr;
+use std::thread::park;
 
 use ana::start_server;
 use clap::*;
@@ -8,7 +8,7 @@ use futures::Future;
 fn main() {
     let (judge_threads, address, port) = get_arguments();
     let mut server = start_server(judge_threads, address, port);
-    io::stdin().read_exact(&mut [0]).unwrap();
+    park();
     server.shutdown().wait().expect("Failed to shutdown server");
 }
 
