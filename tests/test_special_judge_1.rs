@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use liboj::structures::Report;
 
-const PROBLEM: &str = "example_data/spj_problem_1.json";
+const PROBLEM: &str = include_str!("common/data/spj_problem_1.json");
 
 #[test]
 fn test_spj_0_with_ac() {

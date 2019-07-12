@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use liboj::structures::Report;
 
-const PROBLEM: &str = "example_data/problem.json";
+const PROBLEM: &str = include_str!("common/data/problem.json");
 
 #[test]
 fn test_normal_judge_with_ac() {

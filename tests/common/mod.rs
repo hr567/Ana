@@ -1,8 +1,6 @@
 mod service;
 
-use std::fs::read_to_string;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -17,22 +15,21 @@ use service::rpc_grpc::AnaClient;
 
 pub const BYTES_PER_MB: usize = 1024 * 1024;
 
-pub const SOURCE_AC: &str = "example_data/source.cpp";
-pub const SOURCE_CE: &str = "example_data/source.ce.cpp";
-pub const SOURCE_MLE: &str = "example_data/source.mle.cpp";
-pub const SOURCE_RE: &str = "example_data/source.re.cpp";
-pub const SOURCE_TLE: &str = "example_data/source.tle.cpp";
-pub const SOURCE_WA: &str = "example_data/source.wa.cpp";
+pub const SOURCE_AC: &str = include_str!("data/source.cpp");
+pub const SOURCE_CE: &str = include_str!("data/source.ce.cpp");
+pub const SOURCE_MLE: &str = include_str!("data/source.mle.cpp");
+pub const SOURCE_RE: &str = include_str!("data/source.re.cpp");
+pub const SOURCE_TLE: &str = include_str!("data/source.tle.cpp");
+pub const SOURCE_WA: &str = include_str!("data/source.wa.cpp");
 
-pub fn generate_judge_task(source_file: impl AsRef<Path>, problem_file: impl AsRef<Path>) -> Task {
+pub fn generate_judge_task(source: &str, problem: &str) -> Task {
     Task {
         source: Source {
             language: "cpp.g++".to_string(),
-            code: read_to_string(source_file).unwrap(),
+            code: source.to_owned(),
         },
         problem: {
-            let problem_json = read_to_string(problem_file).unwrap();
-            let problem: JsonProblem = serde_json::from_str(&problem_json).unwrap();
+            let problem: JsonProblem = serde_json::from_str(&problem).unwrap();
             match problem {
                 JsonProblem::Normal {
                     time_limit,

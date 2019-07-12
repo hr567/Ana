@@ -7,7 +7,6 @@ test:
   stage: test
   script:
   - export RUST_BACKTRACE=1
-  # - export RUST_LOG=debug
   - apt-get update
   - apt-get install -y
     protobuf-compiler
