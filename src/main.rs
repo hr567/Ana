@@ -58,12 +58,12 @@ fn get_arguments() -> (usize, IpAddr, u16) {
         .value_of("listen_address")
         .unwrap()
         .parse()
-        .expect("Please set address current");
+        .expect("Please set address currently");
     let port = matches
         .value_of("listen_port")
         .unwrap()
         .parse()
-        .expect("Please set port current");
+        .expect("Please set port currently");
 
     (judge_threads, address, port)
 }

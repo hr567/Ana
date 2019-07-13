@@ -8,8 +8,14 @@ A open source judge for ACMers in Rust.
 ## Requirements
 
 * Rust toolchain (Edition 2018 or higher)
-* Protobuf (Dev files and protobuf-compiler)
 * libseccomp
+
+----
+
+Build Dependence:
+* Protobuf (protobuf-compiler)
+* Clang
+* CMake
 
 
 ## Usage
@@ -41,15 +47,10 @@ try again with less `judge_threads`.
 
 It is highly recommended to run Ana in a Docker container.
 Start an Ana server in the background by following commands: \
-`docker run --privileged -d hr567/ana run`
+`docker run --privileged -p 8800:8800 -d hr567/ana`
 
-And you can also use other commands, use \
-`docker run --privileged hr567/ana --help` \
-or \
-`docker run --privileged hr567/ana -- --help`
-
-for more information and see
-all supported commands and configurations.
+For more information and see all supported options: \
+`docker run --privileged hr567/ana --help`
 
 
 ## Client
@@ -74,10 +75,9 @@ workspace
 │   ├── 2
 │   │   └── ..        // same as 0
 │   ├── ..            // more test cases
-│   └── spj           // same as source (if spj is available)
-│       ├── spj
-│       ├── lang
-│       └── source
+│   └── spj
+│       ├── spj       // spj executable file
+│       └── source    // source code
 ├── runtime           // chroot directory (empty)
 |   └── main          // executable file
 └── source            // source code
