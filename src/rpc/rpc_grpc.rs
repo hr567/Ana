@@ -55,7 +55,7 @@ pub trait Ana {
 
 pub fn create_ana<S: Ana + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
     let mut builder = ::grpcio::ServiceBuilder::new();
-    let mut instance = s.clone();
+    let mut instance = s;
     builder = builder.add_server_streaming_handler(&METHOD_ANA_JUDGE, move |ctx, req, resp| {
         instance.judge(ctx, req, resp)
     });

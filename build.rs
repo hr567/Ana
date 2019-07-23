@@ -3,7 +3,12 @@ use std::path::Path;
 use protoc_grpcio;
 
 fn main() {
+    watch_changes();
     build_proto();
+}
+
+fn watch_changes() {
+    println!("cargo:rerun-if-changed={}", "/src/rpc/rpc.proto");
 }
 
 fn build_proto() {

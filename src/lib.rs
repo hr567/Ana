@@ -68,9 +68,9 @@ fn judge(task: Task) -> Box<dyn Iterator<Item = Report> + Send> {
                         "/main",
                         test_case_dir.input_file(),
                         test_case_dir.output_file(),
+                        limit,
                     )
                     .chroot(work_dir.runtime_dir())
-                    .resource_limit(limit)
                     .run()
                     .expect("Failed to run program");
                     generate_report(
@@ -100,9 +100,9 @@ fn judge(task: Task) -> Box<dyn Iterator<Item = Report> + Send> {
                         "/main",
                         test_case_dir.input_file(),
                         test_case_dir.output_file(),
+                        limit,
                     )
                     .chroot(work_dir.runtime_dir())
-                    .resource_limit(limit)
                     .run()
                     .expect("Failed to run program");
                     generate_report(
