@@ -2,16 +2,13 @@
 ///
 /// TODO: Use fuse rewrite in the future for
 /// better performance and less memory usage
-use std::fs;
+use std::fs::{create_dir, write};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use libmount::Tmpfs;
 use liboj::structures::*;
-use nix::mount::umount;
+use nix::mount::{mount, umount, MsFlags};
 use tempfile::{tempdir, TempDir};
-
-const BYTES_PER_MB: usize = 1024 * 1024;
 
 pub struct Workspace {
     inner: TempDir,
@@ -29,17 +26,24 @@ impl Default for Workspace {
             inner: tempdir().expect("Failed to create a temp dir"),
         };
 
-        Tmpfs::new(&workspace)
-            .mode(0o700)
-            .mount()
-            .expect("Failed to mount tmpfs on workspace");
+        mount(
+            Option::<&Path>::None,
+            workspace.as_path(),
+            Some("tmpfs"),
+            MsFlags::empty(),
+            Some("mode=0700"),
+        )
+        .expect("Failed to mount Tmpfs on workspace");
 
-        fs::create_dir(&workspace.runtime_dir()).expect("Failed to create runtime directory");
-        Tmpfs::new(&workspace.runtime_dir())
-            .size_bytes(32 * BYTES_PER_MB)
-            .mode(0o700)
-            .mount()
-            .expect("Failed to mount tmpfs on runtime directory");
+        create_dir(&workspace.runtime_dir()).expect("Failed to create runtime directory");
+        mount(
+            Option::<&Path>::None,
+            &workspace.runtime_dir(),
+            Some("tmpfs"),
+            MsFlags::empty(),
+            Some("size=64m,mode=0700"),
+        )
+        .expect("Failed to mount Tmpfs on runtime dir");
 
         workspace
     }
@@ -47,6 +51,12 @@ impl Default for Workspace {
 
 impl AsRef<Path> for Workspace {
     fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
+}
+
+impl Workspace {
+    fn as_path(&self) -> &Path {
         self.inner.path()
     }
 }
@@ -105,8 +115,8 @@ impl WorkDir for Workspace {
     }
 
     fn prepare_task(&self, task: &Task) -> io::Result<()> {
-        fs::create_dir(self.problem_dir())?;
-        fs::write(self.source_file(), &task.source.code)?;
+        create_dir(self.problem_dir())?;
+        write(self.source_file(), &task.source.code)?;
         self.problem_dir().prepare_problem(&task.problem)?;
         Ok(())
     }
@@ -131,7 +141,7 @@ impl ProblemDir for Path {
             Problem::Normal { cases, .. } => {
                 for (i, test_case) in cases.iter().enumerate() {
                     let test_case_dir = self.join(i.to_string());
-                    fs::create_dir(&test_case_dir)?;
+                    create_dir(&test_case_dir)?;
                     test_case_dir.prepare_test_case(&test_case)?
                 }
             }
@@ -139,7 +149,7 @@ impl ProblemDir for Path {
                 self.prepare_special_judge_problem(problem)?;
                 for (i, test_case) in cases.iter().enumerate() {
                     let test_case_dir = self.join(i.to_string());
-                    fs::create_dir(&test_case_dir)?;
+                    create_dir(&test_case_dir)?;
                     test_case_dir.prepare_test_case(&test_case)?;
                 }
             }
@@ -159,7 +169,7 @@ impl SpecialJudgeProblemDir for Path {
 
     fn prepare_special_judge_problem(&self, problem: &Problem) -> io::Result<()> {
         if let Problem::Special { spj, .. } = problem {
-            fs::write(self.spj_source(), &spj.code)?;
+            write(self.spj_source(), &spj.code)?;
         }
         Ok(())
     }
@@ -185,8 +195,8 @@ impl TestCaseDir for Path {
     }
 
     fn prepare_test_case(&self, test_case: &TestCase) -> io::Result<()> {
-        fs::write(self.input_file(), &test_case.input)?;
-        fs::write(self.answer_file(), &test_case.answer)?;
+        write(self.input_file(), &test_case.input)?;
+        write(self.answer_file(), &test_case.answer)?;
         Ok(())
     }
 }
