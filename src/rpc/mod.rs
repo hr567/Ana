@@ -1,12 +1,12 @@
-pub mod rpc;
-pub mod rpc_grpc;
+mod rpc;
+mod rpc_grpc;
 
 use std::time::Duration;
 
 use liboj::structures::*;
 
 pub use rpc::{Report as RpcReport, Task as RpcTask};
-pub use rpc_grpc::*;
+pub use rpc_grpc::{create_ana, Ana};
 
 impl From<Task> for RpcTask {
     fn from(task: Task) -> RpcTask {

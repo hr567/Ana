@@ -1,4 +1,8 @@
-mod service;
+#[path = "../../src/rpc/"]
+mod rpc {
+    include!("../../src/rpc/mod.rs");
+    pub use rpc_grpc::AnaClient;
+}
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -11,7 +15,7 @@ use liboj::structures::*;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use service::rpc_grpc::AnaClient;
+use rpc::AnaClient;
 
 pub const BYTES_PER_MB: usize = 1024 * 1024;
 
