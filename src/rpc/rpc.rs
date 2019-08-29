@@ -2086,7 +2086,7 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x20\x01(\tR\x04code\"Z\n\x08Resource\x12\x1b\n\treal_time\x18\x01\x20\
     \x01(\x04R\x08realTime\x12\x19\n\x08cpu_time\x18\x02\x20\x01(\x04R\x07cp\
     uTime\x12\x16\n\x06memory\x18\x03\x20\x01(\x04R\x06memory2\"\n\x03Ana\
-    \x12\x1b\n\x05Judge\x12\x05.Task\x1a\x07.Report\"\00\x01b\x06proto3\
+    \x12\x1b\n\x05judge\x12\x05.Task\x1a\x07.Report\"\00\x01b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

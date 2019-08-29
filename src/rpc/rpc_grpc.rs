@@ -20,7 +20,7 @@
 
 const METHOD_ANA_JUDGE: ::grpcio::Method<super::rpc::Task, super::rpc::Report> = ::grpcio::Method {
     ty: ::grpcio::MethodType::ServerStreaming,
-    name: "/Ana/Judge",
+    name: "/Ana/judge",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
