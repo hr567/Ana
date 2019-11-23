@@ -1,0 +1,3 @@
+source = "source.c"
+language = "c.gcc"
+timeout = 5.0

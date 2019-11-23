@@ -1,0 +1,3 @@
+source = "source.c"
+build_script = "build.sh"
+timeout = 5.0

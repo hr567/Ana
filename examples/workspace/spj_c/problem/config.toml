@@ -1,0 +1,6 @@
+type = "SpecialJudge"
+limit = { real_time = 1_000_000_000, cpu_time = 1_000_000_000, memory = 33554432 }
+
+[spj]
+source = "spj.c"
+language = "c.gcc"

@@ -1,0 +1,1 @@
+Workspace for judging a task with C language using custom build script and a normal problem.

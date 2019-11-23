@@ -1,0 +1,1 @@
+Workspace for judging a task with C language and a normal problem.

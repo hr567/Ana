@@ -1,16 +1,78 @@
 syntax = "proto3";
 
+package rpc;
+
+// Main service for judge source code.
 service Ana {
-  rpc judge(Task) returns (stream Report) {}
+  rpc Judge(Task) returns (stream Report) {}
 }
 
 message Task {
-  Source source = 1;
-  Problem problem = 2;
+  // Source file for judging.
+  File source = 1;
+  // Language of the source file.(Optional)
+  string language = 2;
+  // Build script for building executable file.(Optional)
+  File build_script = 3;
+  // Timeout for building process.(Optional, unit in seconds)
+  double build_timeout = 4;
+
+  // Problem which will be used in this task.
+  Problem problem = 5;
+
+  // Custom configuration for setting cgroup, seccomp etc.
+  RunnerConfig runner_config = 8;
 }
 
+message Problem {
+  Resource limit = 1;
+  oneof problem {
+    Normal normal_problem = 2;
+    SpecialJudge spj_problem = 3;
+    Interactive interactive_problem = 4;
+  }
+
+  // Normal problem with some test cases.
+  message Normal {
+    repeated Case cases = 1;
+    bool ignore_white_space_at_line_end = 2;
+    bool ignore_empty_line_at_file_end = 3;
+    File check_script = 4;
+  }
+  // Problem with special judge.
+  // The meaning of `source`, `language` and `build_script` is same as which in
+  // builder.
+  message SpecialJudge {
+    repeated Case cases = 1;
+    File source = 2;
+    string language = 3;
+    File build_script = 4;
+    File check_script = 5;
+  }
+  // Problem with interactive judge.
+  // The meaning of `source`, `language` and `build_script` is same as which in
+  // builder.
+  message Interactive {
+    File source = 1;
+    string language = 2;
+    File build_script = 3;
+    File check_script = 4;
+  }
+  message Case {
+    bytes input = 1;
+    bytes answer = 2;
+  }
+}
+
+// The judge report definition.
+// Contains the judge result and resource usage and an optional system message.
 message Report {
-  enum Result {
+  ResultType result = 1;
+  Resource usage = 2;
+  string message = 3;
+
+  // Defintions of all judge result types.
+  enum ResultType {
     Accepted = 0;
     WrongAnswer = 1;
     TimeLimitExceeded = 2;
@@ -19,41 +81,24 @@ message Report {
     CompileError = 5;
     SystemError = 6;
   }
-  Result result = 1;
-  Resource usage = 2;
-  string message = 3;
 }
 
-message Problem {
-  oneof problem {
-    NormalProblem normal = 1;
-    SpecialProblem special = 2;
-  }
-}
-
-message NormalProblem {
-  Resource limit = 1;
-  repeated TestCase cases = 2;
-}
-
-message SpecialProblem {
-  Resource limit = 1;
-  repeated TestCase cases = 2;
-  Source spj = 3;
-}
-
-message TestCase {
-  string input = 1;
-  string answer = 2;
-}
-
-message Source {
-  string language = 1;
-  string code = 2;
+message File {
+  string filename = 1;
+  bytes content = 2;
 }
 
 message Resource {
   uint64 real_time = 1; // Nanoseconds
   uint64 cpu_time = 2;  // Nanoseconds
   uint64 memory = 3;    // Bytes
+}
+
+message RunnerConfig {
+  // TODO: Unimplemented
+
+  // Command and arguments to execute the program.(Both of them are optional)
+  // Use a different command than the compiled executable file.
+  string command = 1;
+  repeated string args = 2;
 }
