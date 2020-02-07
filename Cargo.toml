@@ -11,7 +11,7 @@ build = "build.rs"
 
 [dependencies]
 clap = "2.33.0"
-futures = "0.1.28"
+futures = "0.3.4"
 grpcio = { version = "= 0.4.4", default-features = false, features = ["protobuf-codec"] }
 liboj = { version = "0.2.3", features = ["gcc", "gxx"] }
 nix = "0.14.1"
