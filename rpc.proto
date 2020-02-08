@@ -2,20 +2,25 @@ syntax = "proto3";
 
 package rpc;
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
 // Main service for judge source code.
 service Ana {
   rpc Judge(Task) returns (stream Report) {}
+  rpc Cache(Problem) returns (google.protobuf.Empty) {}
 }
 
 message Task {
   // Source file for judging.
   File source = 1;
   // Language of the source file.(Optional)
-  string language = 2;
+  google.protobuf.StringValue language = 2;
   // Build script for building executable file.(Optional)
   File build_script = 3;
   // Timeout for building process.(Optional, unit in seconds)
-  double build_timeout = 4;
+  google.protobuf.Duration build_timeout = 4;
 
   // Problem which will be used in this task.
   Problem problem = 5;
@@ -25,18 +30,21 @@ message Task {
 }
 
 message Problem {
-  Resource limit = 1;
+  google.protobuf.StringValue id = 1;
+
+  Resource limit = 2;
   oneof problem {
-    Normal normal_problem = 2;
-    SpecialJudge spj_problem = 3;
-    Interactive interactive_problem = 4;
+    Normal normal_problem = 3;
+    SpecialJudge spj_problem = 4;
+    Interactive interactive_problem = 5;
+    google.protobuf.StringValue cached_problem = 6;
   }
 
   // Normal problem with some test cases.
   message Normal {
     repeated Case cases = 1;
-    bool ignore_white_space_at_line_end = 2;
-    bool ignore_empty_line_at_file_end = 3;
+    google.protobuf.BoolValue ignore_white_space_at_eol = 2;
+    google.protobuf.BoolValue ignore_empty_line_at_eof = 3;
     File check_script = 4;
   }
   // Problem with special judge.
@@ -45,7 +53,7 @@ message Problem {
   message SpecialJudge {
     repeated Case cases = 1;
     File source = 2;
-    string language = 3;
+    google.protobuf.StringValue language = 3;
     File build_script = 4;
     File check_script = 5;
   }
@@ -54,7 +62,7 @@ message Problem {
   // builder.
   message Interactive {
     File source = 1;
-    string language = 2;
+    google.protobuf.StringValue language = 2;
     File build_script = 3;
     File check_script = 4;
   }
@@ -69,7 +77,7 @@ message Problem {
 message Report {
   ResultType result = 1;
   Resource usage = 2;
-  string message = 3;
+  google.protobuf.StringValue message = 3;
 
   // Defintions of all judge result types.
   enum ResultType {
@@ -89,9 +97,9 @@ message File {
 }
 
 message Resource {
-  uint64 real_time = 1; // Nanoseconds
-  uint64 cpu_time = 2;  // Nanoseconds
-  uint64 memory = 3;    // Bytes
+  google.protobuf.Duration real_time = 1;
+  google.protobuf.Duration cpu_time = 2;
+  google.protobuf.UInt64Value memory = 3; // Bytes
 }
 
 message RunnerConfig {
@@ -99,6 +107,61 @@ message RunnerConfig {
 
   // Command and arguments to execute the program.(Both of them are optional)
   // Use a different command than the compiled executable file.
-  string command = 1;
+  google.protobuf.StringValue command = 1;
   repeated string args = 2;
+  Cgroup cgroup = 3;
+  Seccomp seccomp = 4;
+  repeated Namespace namespaces = 5;
+}
+
+message Cgroup {}
+
+message Seccomp {
+  Action default_action = 1;
+  repeated Rule rules = 2;
+
+  enum Action {
+    KILL_PROCESS = 0;
+    KILL_THREAD = 1;
+    KILL = 2;
+    TRAP = 3;
+    ERRNO = 4;
+    TRACE = 5;
+    LOG = 6;
+    ALLOW = 7;
+  }
+
+  message Rule {
+    repeated google.protobuf.StringValue syscalls = 1;
+    Action action = 2;
+    repeated Argument args = 3;
+
+    message Argument {
+      uint32 index = 1;
+      uint64 value = 2;
+      uint64 datum_a = 3;
+      uint64 datum_b = 4;
+    }
+  }
+
+  enum Comparison {
+    MIN = 0;
+    NE = 1;
+    LT = 2;
+    LE = 3;
+    EQ = 4;
+    GE = 5;
+    GT = 6;
+    MASKED_EQ = 7;
+  }
+}
+
+enum Namespace {
+  CGROUP = 0;
+  IPC = 1;
+  NETWORK = 2;
+  MOUNT = 3;
+  PID = 4;
+  USER = 5;
+  UTS = 6;
 }

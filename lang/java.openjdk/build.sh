@@ -1,1 +1,1 @@
-javac $SOURCE_FILE -d $TARGET_DIR
+/usr/bin/javac $SOURCE_FILE -d $TARGET_DIR

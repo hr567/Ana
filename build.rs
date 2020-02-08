@@ -1,19 +1,12 @@
-use std::collections::HashMap;
 use std::env;
-use std::fs::{self, File};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use bincode;
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
-use serde_json;
+use tonic_build;
 
 #[cfg(any(feature = "seccomp", feature = "cap-ng"))]
 use bindgen;
-
-const SECCOMP_HEADER: &str = "/usr/include/seccomp.h";
-const CAPNG_HEADER: &str = "/usr/include/cap-ng.h";
 
 lazy_static! {
     static ref OUT_DIR: PathBuf = {
@@ -28,8 +21,8 @@ lazy_static! {
 
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed={}", "Cargo.toml");
+    println!("cargo:rerun-if-changed={}", "build.rs");
 
-    #[cfg(feature = "rpc")]
     build_proto()?;
 
     #[cfg(feature = "seccomp")]
@@ -41,17 +34,19 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "rpc")]
 fn build_proto() -> io::Result<()> {
-    use tonic_build;
     const RPC_FILE: &str = "./rpc.proto";
     println!("cargo:rerun-if-changed={}", RPC_FILE);
-    tonic_build::compile_protos(RPC_FILE)?;
+    tonic_build::configure()
+        .build_client(false)
+        .build_server(true)
+        .compile(&[RPC_FILE], &["."])?;
     Ok(())
 }
 
 #[cfg(feature = "seccomp")]
 fn generate_libseccomp_binding() -> io::Result<()> {
+    const SECCOMP_HEADER: &str = "/usr/include/seccomp.h";
     println!("cargo:rerun-if-changed={}", SECCOMP_HEADER);
     println!("cargo:rustc-link-lib=dylib=seccomp");
     bindgen::builder()
@@ -64,6 +59,7 @@ fn generate_libseccomp_binding() -> io::Result<()> {
 
 #[cfg(feature = "cap-ng")]
 fn generate_libcap_ng_binding() -> io::Result<()> {
+    const CAPNG_HEADER: &str = "/usr/include/cap-ng.h";
     println!("cargo:rerun-if-changed={}", CAPNG_HEADER);
     println!("cargo:rustc-link-lib=dylib=cap-ng");
     bindgen::builder()

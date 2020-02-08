@@ -1,5 +1,9 @@
-type = "SpecialJudge"
-limit = { real_time = 1_000_000_000, cpu_time = 1_000_000_000, memory = 33554432 }
+problem_type = "SpecialJudge"
+
+[limit]
+real_time = {secs = 1, nanos = 0 }
+cpu_time = {secs = 1, nanos = 0 }
+memory = 33554432
 
 [spj]
 source = "spj.c"

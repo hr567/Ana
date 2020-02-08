@@ -1,0 +1,3 @@
+source = "spj.c"
+language = "c.gcc"
+timeout = { secs = 5, nanos = 0 }

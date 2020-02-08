@@ -1,2 +1,0 @@
-[runner]
-command = "python $SOURCE_FILE"

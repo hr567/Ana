@@ -1,12 +1,12 @@
 use std::ffi::OsString;
 use std::io;
 use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use crate::process::{cgroup, ChildExt, CommandExt};
-use crate::workspace::{config::Runner as RunnerConfig, RuntimeDir};
+use crate::process::cgroup;
+use crate::workspace::{RunnerConfig, RuntimeDir};
 
 pub struct Runner {
     inner: Command,
@@ -14,23 +14,33 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(runtime_dir: &RuntimeDir, config: RunnerConfig) -> io::Result<Runner> {
-        let mut command = Command::new(match config.command {
-            Some(executable) => executable,
-            None => runtime_dir.executable_file(),
+    pub fn new(runtime_dir: &RuntimeDir, config: &RunnerConfig) -> io::Result<Runner> {
+        let mut command = Command::new(match &config.command {
+            Some(executable) => executable.clone(),
+            None => runtime_dir.join("main"),
         });
-        let args = config
-            .args
-            .unwrap_or_default()
-            .into_iter()
-            .map(|s| arguments_map(s, &runtime_dir));
+        let args = match config.args.as_ref().map(|args| {
+            args.into_iter()
+                .map(|s| arguments_map(s.clone(), &runtime_dir))
+                .collect::<Vec<_>>()
+        }) {
+            Some(res) => res,
+            None => Vec::new(),
+        };
         command.args(args).env_clear().current_dir(&runtime_dir);
 
-        let _cgroups_config = config.cgroups.unwrap_or_default();
+        // TODO: handle cgroup configurations
+        // let cgroups_config = config.cgroups.unwrap_or_default();
+        let cgroups_context = cgroup::Builder::new()
+            .cpu_controller(false)
+            .cpuacct_controller(false)
+            .memory_controller(false)
+            .build()?;
 
+        dbg!(&cgroups_context);
         let res = Runner {
             inner: command,
-            cg: unimplemented!("TODO: cgroups setting"),
+            cg: cgroups_context,
         };
 
         Ok(res)
@@ -53,18 +63,15 @@ impl Runner {
 
     pub fn spawn(&mut self) -> io::Result<Program> {
         let child = self.inner.spawn()?;
-        Ok(Program {
-            inner: child,
-            cg: self.cg.clone(),
-        })
+        Ok(Program::new(child, self.cg.clone()))
     }
 }
 
 fn arguments_map(arg: String, runtime_dir: &RuntimeDir) -> OsString {
     match arg.as_str() {
-        "$EXECUTABLE_FILE" => runtime_dir.executable_file().into_os_string(),
-        "$INPUT_FILE" => runtime_dir.join("input").into_os_string(),
-        "$OUTPUT_FILE" => runtime_dir.join("output").into_os_string(),
+        "$EXECUTABLE_FILE" => PathBuf::from("/main").into_os_string(),
+        "$INPUT_FILE" => runtime_dir.input_file().into_os_string(),
+        "$OUTPUT_FILE" => runtime_dir.output_file().into_os_string(),
         _ => OsString::from(arg),
     }
 }

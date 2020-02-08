@@ -1,0 +1,3 @@
+executable = false
+command = "java"
+args = [ "Main" ]

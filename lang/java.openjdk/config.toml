@@ -1,5 +1,0 @@
-[builder]
-filename = "Main.java"
-
-[runner]
-command = "java Main"

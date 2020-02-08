@@ -1,2 +1,1 @@
-#!/bin/sh
-gcc $SOURCE_FILE -o $EXECUTABLE_FILE -O2 -fno-asm -Wall -lm -static -std=c99
+/usr/bin/gcc $SOURCE_FILE -o $EXECUTABLE_FILE -O2 -fno-asm -Wall -lm -static -static-libgcc -std=c99

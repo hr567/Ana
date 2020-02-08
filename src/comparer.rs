@@ -29,26 +29,19 @@ impl Comparer {
         output_file: impl AsRef<Path>,
         answer_file: impl AsRef<Path>,
     ) -> io::Result<bool> {
-        let mut output_buf = BufReader::new(File::open(&output_file).await?);
-        let mut answer_buf = BufReader::new(File::open(&answer_file).await?);
-
+        let output_file = File::open(&output_file).await?;
+        let answer_file = File::open(&answer_file).await?;
+        let mut output_buf = BufReader::new(output_file);
+        let mut answer_buf = BufReader::new(answer_file);
         Ok(!self.buf_diff(&mut output_buf, &mut answer_buf).await?)
     }
 
-    /// Compare two strings.
+    /// Compare two bytes.
     ///
-    /// Return `true` if there is no difference between two strings.
-    pub async fn compare_str(&self, output: &str, answer: &str) -> bool {
-        self.compare_bytes(output.as_bytes(), answer.as_bytes())
-            .await
-    }
-
-    /// Compare two bytes arrays.
-    ///
-    /// Return `true` if there is no difference between two char arrays.
-    pub async fn compare_bytes(&self, output: &[u8], answer: &[u8]) -> bool {
-        let mut output_buf = BufReader::new(output);
-        let mut answer_buf = BufReader::new(answer);
+    /// Return `true` if there is no difference between them.
+    pub async fn compare<S: AsRef<[u8]>>(&self, output: S, answer: S) -> bool {
+        let mut output_buf = BufReader::new(output.as_ref());
+        let mut answer_buf = BufReader::new(answer.as_ref());
         !self
             .buf_diff(&mut output_buf, &mut answer_buf)
             .await
@@ -66,8 +59,8 @@ impl Comparer {
     /// Return `false` if there is no difference between two buffers.
     async fn buf_diff<'a>(
         &self,
-        output_buf: &'a mut (dyn AsyncBufRead + Unpin),
-        answer_buf: &'a mut (dyn AsyncBufRead + Unpin),
+        output_buf: &'a mut (dyn AsyncBufRead + Unpin + Send + Sync),
+        answer_buf: &'a mut (dyn AsyncBufRead + Unpin + Send + Sync),
     ) -> io::Result<bool> {
         loop {
             let output = {
@@ -153,22 +146,21 @@ impl Default for Comparer {
 mod tests {
     use super::*;
 
-    use std::fs;
-
     use futures::executor::block_on;
     use tempfile;
+    use tokio::fs;
 
     fn diff(output: &[u8], answer: &[u8]) -> bool {
-        !block_on(Comparer::default().compare_bytes(&output, &answer))
+        !block_on(Comparer::default().compare(&output, &answer))
     }
 
-    #[test]
-    fn test_diff_complete_eq() {
+    #[tokio::test]
+    async fn test_diff_complete_eq() {
         assert!(!diff(b"hello world", b"hello world"));
     }
 
-    #[test]
-    fn test_diff_with_empty_line_at_eof() {
+    #[tokio::test]
+    async fn test_diff_with_empty_line_at_eof() {
         assert!(!diff(b"hello world\n", b"hello world"));
         assert!(!diff(b"hello world\n\n", b"hello world"));
         assert!(!diff(b"hello world\n", b"hello world\n"));
@@ -178,15 +170,15 @@ mod tests {
         assert!(!diff(b"hello world", b"hello world\n\n"));
     }
 
-    #[test]
-    fn test_diff_with_space_at_eol() {
+    #[tokio::test]
+    async fn test_diff_with_space_at_eol() {
         assert!(!diff(b"hello world ", b"hello world"));
         assert!(!diff(b"hello world  ", b"hello world"));
         assert!(!diff(b"hello world", b"hello world  "));
     }
 
-    #[test]
-    fn test_diff_with_both_empty_line_at_eof_and_space_at_eol() {
+    #[tokio::test]
+    async fn test_diff_with_both_empty_line_at_eof_and_space_at_eol() {
         assert!(!diff(b"hello world \n", b"hello world"));
         assert!(!diff(b"hello world", b"hello world \n"));
         assert!(!diff(b"hello world\n", b"hello world "));
@@ -199,19 +191,19 @@ mod tests {
         assert!(!diff(b"hello world\n", b"hello world\n \n"));
     }
 
-    #[test]
-    fn test_check() -> io::Result<()> {
+    #[tokio::test]
+    async fn test_check() -> io::Result<()> {
         let work_dir = tempfile::tempdir()?;
         let file0 = work_dir.path().join("test_check_without_spj.0");
         let file1 = work_dir.path().join("test_check_without_spj.1");
         let file2 = work_dir.path().join("test_check_without_spj.2");
-        fs::write(&file0, "hello world")?;
-        fs::write(&file1, "hello world")?;
-        fs::write(&file2, "hello_world")?;
+        fs::write(&file0, "hello world").await?;
+        fs::write(&file1, "hello world").await?;
+        fs::write(&file2, "hello_world").await?;
 
         let comparer = Comparer::default();
-        assert!(block_on(comparer.compare_files(&file0, &file1))?);
-        assert!(!block_on(comparer.compare_files(&file0, &file2))?);
+        assert!(comparer.compare_files(&file0, &file1).await?);
+        assert!(!comparer.compare_files(&file0, &file2).await?);
 
         Ok(())
     }

@@ -1,26 +1,31 @@
-use std::fs;
 use std::fs::File;
 use std::io;
-use std::process::Stdio;
+use std::os::unix::fs as unix_fs;
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use futures::prelude::*;
+use log;
+use tokio::fs;
+use tokio::sync::mpsc;
 
 use crate::builder::Builder;
 use crate::comparer::Comparer;
 use crate::process::*;
 use crate::runner::Runner;
 use crate::workspace::{
-    config::{ProblemType, ResourceLimit},
+    build::BuildDir,
+    problem::{ProblemType, ResourceLimit},
     Workspace,
 };
 
+#[derive(Debug)]
 pub struct Report {
     pub result: ResultType,
     pub usage: Option<Resource>,
     pub message: String,
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum ResultType {
     Accepted,
     WrongAnswer,
@@ -31,7 +36,7 @@ pub enum ResultType {
     SystemError,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Resource {
     pub real_time: Duration,
     pub cpu_time: Duration,
@@ -42,111 +47,251 @@ impl From<ResourceLimit> for Resource {
     fn from(r: ResourceLimit) -> Resource {
         Resource {
             memory: r.memory,
-            cpu_time: Duration::from_nanos(r.cpu_time),
-            real_time: Duration::from_nanos(r.real_time),
+            cpu_time: r.cpu_time,
+            real_time: r.real_time,
         }
     }
 }
 
-pub async fn judge(workspace: Workspace) -> io::Result<Box<dyn Stream<Item = Report>>> {
-    let config = workspace.read_config()?;
-
-    let builder = match Builder::new(workspace.build_dir(), config.builder)? {
+pub async fn judge(
+    workspace: Workspace,
+    reporter: mpsc::UnboundedSender<Report>,
+) -> io::Result<()> {
+    log::debug!("Start judging workspace {}", workspace.as_path().display());
+    log::debug!(
+        "Start building source code in {}",
+        workspace.build_dir().display()
+    );
+    let builder = match Builder::new(workspace.build_dir())? {
         Some(builder) => builder,
         None => {
-            let res: Box<dyn Stream<Item = Report>> = Box::new(stream::once(async {
-                Report {
-                    result: ResultType::SystemError,
-                    usage: None,
-                    message: String::from("The language of the source code is not supported"),
-                }
-            }));
-            return Ok(res);
+            let res = Report {
+                result: ResultType::SystemError,
+                usage: None,
+                message: String::from("The language of the source code is not supported"),
+            };
+            if let Err(_) = reporter.send(res) {
+                return Err(broken_channel());
+            }
+            return Ok(());
         }
     };
     let build_result = builder.build().await?;
     if !build_result.success {
-        let res: Box<dyn Stream<Item = Report>> = Box::new(stream::once(async {
-            Report {
-                result: ResultType::CompileError,
-                usage: None,
-                message: String::from_utf8(build_result.stderr).unwrap_or(String::from(
-                    "Stderr of building process is not an valid utf8 string",
-                )),
-            }
-        }));
-        return Ok(res);
+        let res = Report {
+            result: ResultType::CompileError,
+            usage: None,
+            message: String::from_utf8(build_result.stderr).unwrap_or(String::from(
+                "Stderr of building process is not an valid utf8 string",
+            )),
+        };
+        if let Err(_) = reporter.send(res) {
+            return Err(broken_channel());
+        }
+        return Ok(());
     }
+    log::debug!(
+        "Building source code in {} is finished",
+        workspace.build_dir().display()
+    );
 
+    log::debug!(
+        "Start move compiled file to runtime directory {}",
+        workspace.runtime_dir().display()
+    );
     for file in workspace.build_dir().target_dir().read_dir()? {
-        fs::copy(file?.path(), workspace.runtime_dir())?;
+        let src = file?.path();
+        let dst = workspace.runtime_dir().join(
+            src.strip_prefix(workspace.build_dir().target_dir())
+                .unwrap(),
+        );
+        fs::rename(src, dst).await?;
     }
+    log::debug!(
+        "All compiled file has been moved to runtime directory {}",
+        workspace.runtime_dir().display()
+    );
 
-    let resource_limit = Resource::from(config.problem.limit);
-
-    match config.problem.r#type {
+    log::debug!("Start run program in {}", workspace.runtime_dir().display());
+    let problem_dir = workspace.problem_dir();
+    match problem_dir.config().problem_type {
         ProblemType::Normal => {
-            let it = workspace
-                .problem_dir()
-                .cases()
-                .map(async move |case| -> io::Result<Report> {
-                    let config = workspace.read_config()?;
-                    let runtime_dir = workspace.runtime_dir();
-                    runtime_dir.activate_case(&case)?;
-                    let mut child = Runner::new(&runtime_dir, config.runner.unwrap_or_default())?
-                        .stdin(File::open(runtime_dir.input_file())?)
-                        .stdout(File::create(runtime_dir.output_file())?)
-                        .stderr(Stdio::piped())
-                        .spawn()?;
-                    let start_time = Instant::now();
-                    let exit_status = child.timeout(resource_limit.real_time)?;
+            for case in workspace.problem_dir().cases() {
+                let runtime_dir = workspace.runtime_dir();
+                if runtime_dir.input_file().exists() {
+                    fs::remove_file(runtime_dir.input_file()).await?;
+                }
+                if runtime_dir.output_file().exists() {
+                    fs::remove_file(runtime_dir.output_file()).await?;
+                }
+                let runner_config = &workspace.config().runner;
+                log::debug!("Symlink the input file {}", case.input_file().display());
+                unix_fs::symlink(case.input_file(), runtime_dir.input_file())?;
+                log::debug!("Run the program in {}", runtime_dir.display());
+                let mut child = Runner::new(&runtime_dir, runner_config)?
+                    .stdin(File::open(runtime_dir.input_file())?)
+                    .stdout(File::create(runtime_dir.output_file())?)
+                    .stderr(Stdio::piped())
+                    .spawn()?;
+                log::debug!(
+                    "Wait the process and get the result {}",
+                    runtime_dir.display()
+                );
+                let start_time = Instant::now();
+                let exit_status = child.timeout(problem_dir.config().limit.real_time)?;
+                let resource_usage = {
                     let real_time = start_time.elapsed();
                     let (memory, cpu_time) = child.get_resource_usage()?;
-                    let resource_usage = Resource {
+                    Resource {
                         memory,
                         cpu_time,
                         real_time: real_time,
-                    };
+                    }
+                };
+                log::debug!("Generate the process report of {}", runtime_dir.display());
 
-                    let result_type = if resource_usage.memory >= resource_limit.memory {
-                        ResultType::MemoryLimitExceeded
-                    } else if resource_usage.real_time > resource_limit.real_time
-                        || resource_usage.cpu_time > resource_limit.cpu_time
-                    {
-                        ResultType::TimeLimitExceeded
-                    } else if !exit_status.success() {
-                        ResultType::RuntimeError
-                    } else if Comparer::new(
-                        config.problem.ignore_white_space_at_eol.unwrap_or(true),
-                        config.problem.ignore_empty_line_at_eof.unwrap_or(true),
+                let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
+                    ResultType::MemoryLimitExceeded
+                } else if resource_usage.real_time > problem_dir.config().limit.real_time
+                    || resource_usage.cpu_time > problem_dir.config().limit.cpu_time
+                {
+                    ResultType::TimeLimitExceeded
+                } else if !exit_status.success() {
+                    ResultType::RuntimeError
+                } else {
+                    if Comparer::new(
+                        problem_dir
+                            .config()
+                            .ignore_white_space_at_eol
+                            .unwrap_or(true),
+                        problem_dir
+                            .config()
+                            .ignore_empty_line_at_eof
+                            .unwrap_or(true),
                     )
                     .compare_files(runtime_dir.output_file(), case.answer_file())
-                    .await
-                    .unwrap_or(false)
+                    .await?
                     {
                         ResultType::Accepted
                     } else {
                         ResultType::WrongAnswer
-                    };
+                    }
+                };
 
-                    Ok(Report {
-                        result: result_type,
-                        usage: Some(resource_usage),
-                        message: String::new(),
-                    })
-                })
-                .map(async move |res| match res.await {
-                    Ok(report) => report,
-                    Err(e) => Report {
+                let res = Report {
+                    result: result_type,
+                    usage: Some(resource_usage),
+                    message: String::new(),
+                };
+                if let Err(_) = reporter.send(res) {
+                    return Err(broken_channel());
+                }
+            }
+        }
+        ProblemType::SpecialJudge => {
+            let spj_dir = BuildDir::from_path(workspace.problem_dir().extern_program())?;
+            let spj_builder = Builder::new(&spj_dir)?;
+            let spj_builder = match spj_builder {
+                Some(spj_builder) => spj_builder,
+                None => {
+                    let res = Report {
                         result: ResultType::SystemError,
                         usage: None,
-                        message: format!("IO Error: {}", e),
-                    },
-                });
-            let res: Box<dyn Stream<Item = Report>> = Box::new(stream::iter(it));
-            Ok(res)
+                        message: String::from("The special judge of the problem is missing."),
+                    };
+                    if let Err(_) = reporter.send(res) {
+                        return Err(broken_channel());
+                    }
+                    return Ok(());
+                }
+            };
+            let spj_build_result = spj_builder.build().await?;
+            if !spj_build_result.success {
+                let res = Report {
+                    result: ResultType::SystemError,
+                    usage: None,
+                    message: String::from("Failed to build the special judge of the problem."),
+                };
+                if let Err(_) = reporter.send(res) {
+                    return Err(broken_channel());
+                }
+                return Ok(());
+            }
+
+            for case in workspace.problem_dir().cases() {
+                let runtime_dir = workspace.runtime_dir();
+                if runtime_dir.input_file().exists() {
+                    fs::remove_file(runtime_dir.input_file()).await?;
+                }
+                if runtime_dir.output_file().exists() {
+                    fs::remove_file(runtime_dir.output_file()).await?;
+                }
+                let runner_config = &workspace.config().runner;
+                log::debug!("Symlink the input file {}", case.input_file().display());
+                unix_fs::symlink(case.input_file(), runtime_dir.input_file())?;
+                log::debug!("Run the program in {}", runtime_dir.display());
+                let mut child = Runner::new(&runtime_dir, runner_config)?
+                    .stdin(File::open(runtime_dir.input_file())?)
+                    .stdout(File::create(runtime_dir.output_file())?)
+                    .stderr(Stdio::piped())
+                    .spawn()?;
+                log::debug!(
+                    "Wait the process and get the result {}",
+                    runtime_dir.display()
+                );
+                let start_time = Instant::now();
+                let exit_status = child.timeout(problem_dir.config().limit.real_time)?;
+                let resource_usage = {
+                    let real_time = start_time.elapsed();
+                    let (memory, cpu_time) = child.get_resource_usage()?;
+                    Resource {
+                        memory,
+                        cpu_time,
+                        real_time: real_time,
+                    }
+                };
+                log::debug!("Generate the process report of {}", runtime_dir.display());
+
+                let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
+                    ResultType::MemoryLimitExceeded
+                } else if resource_usage.real_time > problem_dir.config().limit.real_time
+                    || resource_usage.cpu_time > problem_dir.config().limit.cpu_time
+                {
+                    ResultType::TimeLimitExceeded
+                } else if !exit_status.success() {
+                    ResultType::RuntimeError
+                } else if Command::new(spj_dir.executable_file())
+                    .arg(case.input_file())
+                    .arg(runtime_dir.output_file())
+                    .arg(case.answer_file())
+                    .spawn()?
+                    .wait()?
+                    .success()
+                {
+                    ResultType::Accepted
+                } else {
+                    ResultType::WrongAnswer
+                };
+
+                let res = Report {
+                    result: result_type,
+                    usage: Some(resource_usage),
+                    message: String::new(),
+                };
+                if let Err(_) = reporter.send(res) {
+                    return Err(broken_channel());
+                }
+            }
         }
-        ProblemType::SpecialJudge => unimplemented!("TODO: Special judge support"),
         ProblemType::Interactive => unimplemented!("TODO: Interactive support"),
     }
+
+    Ok(())
+}
+
+fn broken_channel() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::BrokenPipe,
+        "Failed to send any more report through judge channel",
+    )
 }
