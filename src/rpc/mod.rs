@@ -3,6 +3,7 @@ mod rpc;
 use std::io;
 use std::marker::Unpin;
 use std::net::{IpAddr, SocketAddr};
+use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process;
@@ -139,7 +140,14 @@ impl RpcTask for Task {
         }
 
         if let Some(runner) = &self.runner_config {
-            let runner_config = workspace::RunnerConfig::from(runner);
+            // TODO: Runner config support
+            let runner_config = workspace::RunnerConfig {
+                command: runner.command.clone().map(PathBuf::from),
+                args: Some(runner.args.clone()),
+                cgroups: None,
+                seccomp: None,
+                namespaces: None,
+            };
             fs::write(
                 workspace.path().join("config.toml"),
                 &toml::to_string(&runner_config).unwrap(),
@@ -147,7 +155,7 @@ impl RpcTask for Task {
             .await?;
         }
 
-        unimplemented!()
+        Ok(Workspace::from_path(workspace)?)
     }
 }
 
@@ -308,10 +316,10 @@ async fn construct_problem_dir<P: AsRef<Path>>(
         rpc::problem::Problem::InteractiveProblem { .. } => {
             unimplemented!("Interactive problem is not supported now")
         }
-        rpc::problem::Problem::CachedProblem { .. } => {
-            unimplemented!("Cached problem is not supported now")
+        rpc::problem::Problem::CachedProblem(cached_problem) => {
+            unix_fs::symlink(cached_problem, problem_dir)?;
         }
     }
 
-    unimplemented!()
+    Ok(())
 }

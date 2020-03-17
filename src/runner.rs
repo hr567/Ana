@@ -19,14 +19,13 @@ impl Runner {
             Some(executable) => executable.clone(),
             None => runtime_dir.join("main"),
         });
-        let args = match config.args.as_ref().map(|args| {
-            args.into_iter()
-                .map(|s| arguments_map(s.clone(), &runtime_dir))
-                .collect::<Vec<_>>()
-        }) {
-            Some(res) => res,
-            None => Vec::new(),
-        };
+        let args: Vec<_> = config
+            .args
+            .clone()
+            .unwrap_or_default()
+            .iter()
+            .map(|s| arguments_map(s.clone(), &runtime_dir))
+            .collect();
         command.args(args).env_clear().current_dir(&runtime_dir);
 
         // TODO: handle cgroup configurations

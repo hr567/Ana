@@ -59,15 +59,3 @@ impl From<Resource> for workspace::problem::ResourceLimit {
         }
     }
 }
-
-impl From<RunnerConfig> for workspace::RunnerConfig {
-    fn from(_config: RunnerConfig) -> workspace::RunnerConfig {
-        unimplemented!("TODO: RunnerConfig is unavailable now")
-    }
-}
-
-impl From<&RunnerConfig> for workspace::RunnerConfig {
-    fn from(_config: &RunnerConfig) -> workspace::RunnerConfig {
-        unimplemented!("TODO: RunnerConfig is unavailable now")
-    }
-}

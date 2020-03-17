@@ -37,6 +37,7 @@ message Problem {
     Normal normal_problem = 3;
     SpecialJudge spj_problem = 4;
     Interactive interactive_problem = 5;
+    // A path of an exist problem directory.
     google.protobuf.StringValue cached_problem = 6;
   }
 
