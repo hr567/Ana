@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package rpc;
+package ana_rpc;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
@@ -8,8 +8,9 @@ import "google/protobuf/wrappers.proto";
 
 // Main service for judge source code.
 service Ana {
-  rpc Judge(Task) returns (stream Report) {}
-  rpc Cache(Problem) returns (google.protobuf.Empty) {}
+  // rpc Judge(Task) returns (stream Report) {}
+  rpc JudgeWorkspace(Workspace) returns (stream Report) {}
+  // rpc Cache(Problem) returns (google.protobuf.Empty) {}
 }
 
 message Task {
@@ -166,3 +167,5 @@ enum Namespace {
   USER = 5;
   UTS = 6;
 }
+
+message Workspace { google.protobuf.StringValue path = 1; }

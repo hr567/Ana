@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::judge;
 use crate::workspace;
 
-tonic::include_proto!("rpc");
+tonic::include_proto!("ana_rpc");
 
 impl From<judge::Report> for Report {
     fn from(report: judge::Report) -> Report {
