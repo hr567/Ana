@@ -82,8 +82,8 @@ impl Comparer {
                 }
             };
 
-            let mut output = output.as_ref().map(|v| v.as_slice());
-            let mut answer = answer.as_ref().map(|v| v.as_slice());
+            let mut output = output.as_deref();
+            let mut answer = answer.as_deref();
             if self.ignore_white_space_at_eol {
                 output = output.map(|s| trim_end(s));
                 answer = answer.map(|s| trim_end(s));

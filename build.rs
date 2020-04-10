@@ -20,8 +20,8 @@ lazy_static! {
 }
 
 fn main() -> io::Result<()> {
-    println!("cargo:rerun-if-changed={}", "Cargo.toml");
-    println!("cargo:rerun-if-changed={}", "build.rs");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=build.rs",);
 
     build_proto()?;
 

@@ -1,4 +1,4 @@
-mod rpc;
+mod ana_rpc;
 
 use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
@@ -14,6 +14,7 @@ use tonic::{Request, Response, Status};
 
 use crate::judge;
 use crate::workspace::Workspace;
+use ana_rpc as rpc;
 
 pub struct RpcServer {
     runtime: Runtime,

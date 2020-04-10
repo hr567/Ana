@@ -70,7 +70,7 @@ pub async fn judge(
                 usage: None,
                 message: String::from("The language of the source code is not supported"),
             };
-            if let Err(_) = reporter.send(res) {
+            if reporter.send(res).is_err() {
                 return Err(broken_channel());
             }
             return Ok(());
@@ -81,11 +81,11 @@ pub async fn judge(
         let res = Report {
             result: ResultType::CompileError,
             usage: None,
-            message: String::from_utf8(build_result.stderr).unwrap_or(String::from(
-                "Stderr of building process is not an valid utf8 string",
-            )),
+            message: String::from_utf8(build_result.stderr).unwrap_or_else(|_e| {
+                String::from("Stderr of building process is not an valid utf8 string")
+            }),
         };
-        if let Err(_) = reporter.send(res) {
+        if reporter.send(res).is_err() {
             return Err(broken_channel());
         }
         return Ok(());
@@ -145,7 +145,7 @@ pub async fn judge(
                     Resource {
                         memory,
                         cpu_time,
-                        real_time: real_time,
+                        real_time,
                     }
                 };
                 log::debug!("Generate the process report of {}", runtime_dir.display());
@@ -158,24 +158,22 @@ pub async fn judge(
                     ResultType::TimeLimitExceeded
                 } else if !exit_status.success() {
                     ResultType::RuntimeError
+                } else if Comparer::new(
+                    problem_dir
+                        .config()
+                        .ignore_white_space_at_eol
+                        .unwrap_or(true),
+                    problem_dir
+                        .config()
+                        .ignore_empty_line_at_eof
+                        .unwrap_or(true),
+                )
+                .compare_files(runtime_dir.output_file(), case.answer_file())
+                .await?
+                {
+                    ResultType::Accepted
                 } else {
-                    if Comparer::new(
-                        problem_dir
-                            .config()
-                            .ignore_white_space_at_eol
-                            .unwrap_or(true),
-                        problem_dir
-                            .config()
-                            .ignore_empty_line_at_eof
-                            .unwrap_or(true),
-                    )
-                    .compare_files(runtime_dir.output_file(), case.answer_file())
-                    .await?
-                    {
-                        ResultType::Accepted
-                    } else {
-                        ResultType::WrongAnswer
-                    }
+                    ResultType::WrongAnswer
                 };
 
                 let res = Report {
@@ -183,7 +181,7 @@ pub async fn judge(
                     usage: Some(resource_usage),
                     message: String::new(),
                 };
-                if let Err(_) = reporter.send(res) {
+                if reporter.send(res).is_err() {
                     return Err(broken_channel());
                 }
             }
@@ -199,7 +197,7 @@ pub async fn judge(
                         usage: None,
                         message: String::from("The special judge of the problem is missing."),
                     };
-                    if let Err(_) = reporter.send(res) {
+                    if reporter.send(res).is_err() {
                         return Err(broken_channel());
                     }
                     return Ok(());
@@ -212,7 +210,7 @@ pub async fn judge(
                     usage: None,
                     message: String::from("Failed to build the special judge of the problem."),
                 };
-                if let Err(_) = reporter.send(res) {
+                if reporter.send(res).is_err() {
                     return Err(broken_channel());
                 }
                 return Ok(());
@@ -247,7 +245,7 @@ pub async fn judge(
                     Resource {
                         memory,
                         cpu_time,
-                        real_time: real_time,
+                        real_time,
                     }
                 };
                 log::debug!("Generate the process report of {}", runtime_dir.display());
@@ -278,7 +276,7 @@ pub async fn judge(
                     usage: Some(resource_usage),
                     message: String::new(),
                 };
-                if let Err(_) = reporter.send(res) {
+                if reporter.send(res).is_err() {
                     return Err(broken_channel());
                 }
             }

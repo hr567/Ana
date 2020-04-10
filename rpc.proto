@@ -9,73 +9,86 @@ import "google/protobuf/wrappers.proto";
 // Main service for judge source code.
 service Ana {
   // rpc Judge(Task) returns (stream Report) {}
-  rpc JudgeWorkspace(Workspace) returns (stream Report) {}
   // rpc Cache(Problem) returns (google.protobuf.Empty) {}
+  rpc JudgeWorkspace(Workspace) returns (google.protobuf.Empty) {}
+  rpc GetReport(Request) returns (Report) {}
 }
 
-message Task {
-  // Source file for judging.
-  File source = 1;
-  // Language of the source file.(Optional)
-  google.protobuf.StringValue language = 2;
-  // Build script for building executable file.(Optional)
-  File build_script = 3;
-  // Timeout for building process.(Optional, unit in seconds)
-  google.protobuf.Duration build_timeout = 4;
-
-  // Problem which will be used in this task.
-  Problem problem = 5;
-
-  // Custom configuration for setting cgroup, seccomp etc.
-  RunnerConfig runner_config = 8;
-}
-
-message Problem {
+message Workspace {
   google.protobuf.StringValue id = 1;
-
-  Resource limit = 2;
-  oneof problem {
-    Normal normal_problem = 3;
-    SpecialJudge spj_problem = 4;
-    Interactive interactive_problem = 5;
-    // A path of an exist problem directory.
-    google.protobuf.StringValue cached_problem = 6;
-  }
-
-  // Normal problem with some test cases.
-  message Normal {
-    repeated Case cases = 1;
-    google.protobuf.BoolValue ignore_white_space_at_eol = 2;
-    google.protobuf.BoolValue ignore_empty_line_at_eof = 3;
-    File check_script = 4;
-  }
-  // Problem with special judge.
-  // The meaning of `source`, `language` and `build_script` is same as which in
-  // builder.
-  message SpecialJudge {
-    repeated Case cases = 1;
-    File source = 2;
-    google.protobuf.StringValue language = 3;
-    File build_script = 4;
-    File check_script = 5;
-  }
-  // Problem with interactive judge.
-  // The meaning of `source`, `language` and `build_script` is same as which in
-  // builder.
-  message Interactive {
-    File source = 1;
-    google.protobuf.StringValue language = 2;
-    File build_script = 3;
-    File check_script = 4;
-  }
-  message Case {
-    bytes input = 1;
-    bytes answer = 2;
-  }
+  google.protobuf.StringValue path = 2;
 }
 
-// The judge report definition.
-// Contains the judge result and resource usage and an optional system message.
+message Request { google.protobuf.StringValue id = 1; }
+
+// message Task {
+//   // Unique ID for this task.
+//   google.protobuf.StringValue id = 1;
+//   // Source file for judging.
+//   File source = 2;
+//   // Language of the source file.(Optional)
+//   google.protobuf.StringValue language = 3;
+//   // Build script for building executable file.(Optional)
+//   File build_script = 4;
+//   // Timeout for building process.(Optional, unit in seconds)
+//   google.protobuf.Duration build_timeout = 5;
+
+//   // Problem which will be used in this task.
+//   Problem problem = 6;
+
+//   // Custom configuration for setting cgroup, seccomp etc.
+//   RunnerConfig runner_config = 7;
+// }
+
+// message Problem {
+//   google.protobuf.StringValue id = 1;
+
+//   Resource limit = 2;
+//   oneof problem {
+//     Normal normal_problem = 3;
+//     SpecialJudge spj_problem = 4;
+//     Interactive interactive_problem = 5;
+//     // A path of an exist problem directory.
+//     google.protobuf.StringValue cached_problem = 6;
+//   }
+
+//   // Normal problem with some test cases.
+//   message Normal {
+//     repeated Case cases = 1;
+//     google.protobuf.BoolValue ignore_white_space_at_eol = 2;
+//     google.protobuf.BoolValue ignore_empty_line_at_eof = 3;
+//     File check_script = 4;
+//   }
+//   // Problem with special judge.
+//   // The meaning of `source`, `language` and `build_script` is same as which
+//   in
+//   // builder.
+//   message SpecialJudge {
+//     repeated Case cases = 1;
+//     File source = 2;
+//     google.protobuf.StringValue language = 3;
+//     File build_script = 4;
+//     File check_script = 5;
+//   }
+//   // Problem with interactive judge.
+//   // The meaning of `source`, `language` and `build_script` is same as which
+//   in
+//   // builder.
+//   message Interactive {
+//     File source = 1;
+//     google.protobuf.StringValue language = 2;
+//     File build_script = 3;
+//     File check_script = 4;
+//   }
+//   message Case {
+//     bytes input = 1;
+//     bytes answer = 2;
+//   }
+// }
+
+// // The judge report definition.
+// // Contains the judge result and resource usage and an optional system
+// message.
 message Report {
   ResultType result = 1;
   Resource usage = 2;
@@ -93,10 +106,10 @@ message Report {
   }
 }
 
-message File {
-  string filename = 1;
-  bytes content = 2;
-}
+// message File {
+//   string filename = 1;
+//   bytes content = 2;
+// }
 
 message Resource {
   google.protobuf.Duration real_time = 1;
@@ -104,68 +117,66 @@ message Resource {
   google.protobuf.UInt64Value memory = 3; // Bytes
 }
 
-message RunnerConfig {
-  // TODO: Unimplemented
+// message RunnerConfig {
+//   // TODO: Unimplemented
 
-  // Command and arguments to execute the program.(Both of them are optional)
-  // Use a different command than the compiled executable file.
-  google.protobuf.StringValue command = 1;
-  repeated string args = 2;
-  Cgroup cgroup = 3;
-  Seccomp seccomp = 4;
-  repeated Namespace namespaces = 5;
-}
+//   // Command and arguments to execute the program.(Both of them are optional)
+//   // Use a different command than the compiled executable file.
+//   google.protobuf.StringValue command = 1;
+//   repeated string args = 2;
+//   Cgroup cgroup = 3;
+//   Seccomp seccomp = 4;
+//   repeated Namespace namespaces = 5;
+// }
 
-message Cgroup {}
+// message Cgroup {}
 
-message Seccomp {
-  Action default_action = 1;
-  repeated Rule rules = 2;
+// message Seccomp {
+//   Action default_action = 1;
+//   repeated Rule rules = 2;
 
-  enum Action {
-    KILL_PROCESS = 0;
-    KILL_THREAD = 1;
-    KILL = 2;
-    TRAP = 3;
-    ERRNO = 4;
-    TRACE = 5;
-    LOG = 6;
-    ALLOW = 7;
-  }
+//   enum Action {
+//     KILL_PROCESS = 0;
+//     KILL_THREAD = 1;
+//     KILL = 2;
+//     TRAP = 3;
+//     ERRNO = 4;
+//     TRACE = 5;
+//     LOG = 6;
+//     ALLOW = 7;
+//   }
 
-  message Rule {
-    repeated google.protobuf.StringValue syscalls = 1;
-    Action action = 2;
-    repeated Argument args = 3;
+//   message Rule {
+//     repeated google.protobuf.StringValue syscalls = 1;
+//     Action action = 2;
+//     repeated Argument args = 3;
 
-    message Argument {
-      uint32 index = 1;
-      uint64 value = 2;
-      uint64 datum_a = 3;
-      uint64 datum_b = 4;
-    }
-  }
+//     message Argument {
+//       uint32 index = 1;
+//       uint64 value = 2;
+//       uint64 datum_a = 3;
+//       uint64 datum_b = 4;
+//     }
+//   }
 
-  enum Comparison {
-    MIN = 0;
-    NE = 1;
-    LT = 2;
-    LE = 3;
-    EQ = 4;
-    GE = 5;
-    GT = 6;
-    MASKED_EQ = 7;
-  }
-}
+//   enum Comparison {
+//     MIN = 0;
+//     NE = 1;
+//     LT = 2;
+//     LE = 3;
+//     EQ = 4;
+//     GE = 5;
+//     GT = 6;
+//     MASKED_EQ = 7;
+//   }
+// }
 
-enum Namespace {
-  CGROUP = 0;
-  IPC = 1;
-  NETWORK = 2;
-  MOUNT = 3;
-  PID = 4;
-  USER = 5;
-  UTS = 6;
-}
-
-message Workspace { google.protobuf.StringValue path = 1; }
+// enum Namespace {
+//   CGROUP = 0;
+//   IPC = 1;
+//   NETWORK = 2;
+//   MOUNT = 3;
+//   PID = 4;
+//   USER = 5;
+//   UTS = 6;
+// }

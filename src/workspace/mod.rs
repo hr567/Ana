@@ -87,13 +87,5 @@ pub struct Config {
     pub runner: RunnerConfig,
 }
 
-pub struct Builder {}
-
-impl Builder {
-    pub fn new() -> Builder {
-        unimplemented!()
-    }
-}
-
 #[cfg(test)]
 mod tests;

@@ -31,11 +31,10 @@ impl Builder {
             } else {
                 None
             };
-            let res = match script {
+            match script {
                 Some(script) => script,
                 None => return Ok(None),
-            };
-            res
+            }
         };
         let script = script.canonicalize()?;
         if !script.starts_with(&build_dir) {
