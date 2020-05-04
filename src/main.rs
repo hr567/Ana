@@ -2,8 +2,10 @@ use std::io;
 use std::net::IpAddr;
 
 use clap::*;
+use tokio;
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     let matches = App::new("Ana judge program")
         .version(crate_version!())
         .author(crate_authors!())
