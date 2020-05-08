@@ -72,6 +72,7 @@ pub struct RpcServer {
 impl RpcServer {
     pub fn new(max_threads: usize) -> RpcServer {
         let runtime = runtime::Builder::new()
+            .threaded_scheduler()
             .core_threads(max_threads)
             .enable_all()
             .build()
