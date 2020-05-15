@@ -52,6 +52,9 @@ impl Builder {
     }
 
     pub async fn build(&self) -> io::Result<BuilderOutput> {
+        if !self.target_dir.exists() {
+            fs::create_dir(&self.target_dir)?;
+        }
         fs::set_permissions(&self.script, Permissions::from_mode(0o700))?;
         let res = Command::new("/bin/sh")
             .arg("-c")
