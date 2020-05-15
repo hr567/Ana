@@ -7,8 +7,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-#[cfg(not(test))]
-use log;
 use serde::{Deserialize, Serialize};
 
 pub use {
@@ -69,16 +67,6 @@ impl Workspace {
 
     pub fn problem_dir(&self) -> &ProblemDir {
         &self.problem_dir
-    }
-}
-
-#[cfg(not(test))]
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        match fs::remove_dir_all(self.as_path()) {
-            Ok(()) => {}
-            Err(e) => log::warn!("Failed to remove workspace. {}", e),
-        }
     }
 }
 

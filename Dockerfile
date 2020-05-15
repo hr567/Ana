@@ -9,6 +9,7 @@ RUN apt-get update && \
     cargo build --release
 
 FROM ubuntu:18.04
+COPY . /Ana
 COPY --from=build /Ana/target/release/ana /usr/local/bin
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
