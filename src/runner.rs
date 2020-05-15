@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use crate::process::cgroup;
+use crate::process::cgroup::{self, CommandExt};
 use crate::workspace::{RunnerConfig, RuntimeDir};
 
 pub struct Runner {
@@ -31,10 +31,11 @@ impl Runner {
         // TODO: handle cgroup configurations
         // let cgroups_config = config.cgroups.unwrap_or_default();
         let cgroups_context = cgroup::Builder::new()
-            .cpu_controller(false)
-            .cpuacct_controller(false)
-            .memory_controller(false)
+            .cpu_controller(true)
+            .cpuacct_controller(true)
+            .memory_controller(true)
             .build()?;
+        command.cgroup(cgroups_context.clone());
 
         dbg!(&cgroups_context);
         let res = Runner {
@@ -86,7 +87,7 @@ impl Program {
     }
 
     pub fn get_resource_usage(&self) -> io::Result<(usize, Duration)> {
-        Ok((
+        let res = (
             match self.cg.memory_controller() {
                 Some(controller) => controller.max_usage_in_bytes()?,
                 None => 0,
@@ -95,7 +96,18 @@ impl Program {
                 Some(controller) => controller.usage()?,
                 None => Duration::from_secs(0),
             },
-        ))
+        );
+        Ok(res)
+    }
+}
+
+impl Drop for Program {
+    fn drop(&mut self) {
+        unsafe {
+            if let Err(e) = self.cg.remove() {
+                log::debug!("Error when dropping cgroup {}", e);
+            }
+        }
     }
 }
 

@@ -2,10 +2,13 @@ use std::io;
 use std::net::IpAddr;
 
 use clap::*;
+use env_logger;
 use tokio;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    env_logger::init();
+
     let matches = App::new("Ana judge program")
         .version(crate_version!())
         .author(crate_authors!())

@@ -77,6 +77,13 @@ impl Context {
         }
         Ok(())
     }
+
+    pub unsafe fn remove(&self) -> io::Result<()> {
+        for hierarchy in self.hierarchies() {
+            remove_dir(hierarchy.path())?;
+        }
+        Ok(())
+    }
 }
 
 impl Context {
@@ -98,14 +105,6 @@ impl Context {
             res.push(Box::new(controller));
         }
         res
-    }
-}
-
-impl Drop for Context {
-    fn drop(&mut self) {
-        for hierarchy in self.hierarchies() {
-            let _ = remove_dir(hierarchy.path());
-        }
     }
 }
 
@@ -198,9 +197,8 @@ pub trait CommandExt {
 }
 
 impl CommandExt for Command {
-    fn cgroup(&mut self, ctx: Context) -> &mut Command {
+    fn cgroup(&mut self, mut ctx: Context) -> &mut Command {
         // Ensure that the cgroup context will not be dropped in child process
-        let ctx = Box::leak(Box::new(ctx));
         unsafe {
             self.pre_exec(move || {
                 ctx.add_process(nix::unistd::Pid::this())?;
