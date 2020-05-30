@@ -105,7 +105,7 @@ pub async fn judge(
             src.strip_prefix(workspace.build_dir().target_dir())
                 .unwrap(),
         );
-        fs::rename(src, dst).await?;
+        fs::copy(src, dst).await?;
     }
     log::debug!(
         "All compiled file has been moved to runtime directory {}",

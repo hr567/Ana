@@ -11,7 +11,6 @@ use crate::workspace::Workspace;
 
 #[tokio::test]
 async fn test_normal_c() -> io::Result<()> {
-    env_logger::init();
     const EXAMPLE_WORKSPACE: &str = "examples/workspace/normal_c";
     let workspace = tempfile::tempdir()?;
     copy_dir(EXAMPLE_WORKSPACE, workspace.path())?;
@@ -62,12 +61,7 @@ fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> io::Result<()> {
 async fn test_workspace(workspace: Workspace) -> io::Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel();
     judge(workspace, tx).await?;
-    assert!(
-        rx.all(|report| {
-            dbg!(&report);
-            report.result == ResultType::Accepted
-        })
-        .await
-    );
+    let res = rx.all(|report| report.result == ResultType::Accepted).await;
+    assert!(res);
     Ok(())
 }
