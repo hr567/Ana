@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use crate::process::cgroup::{self, CommandExt};
+use crate::process::{cgroup, cgroup::CommandExt as _, CommandExt as _};
 use crate::workspace::{RunnerConfig, RuntimeDir};
 
 pub struct Runner {
@@ -15,16 +15,22 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(runtime_dir: &RuntimeDir, config: &RunnerConfig) -> io::Result<Runner> {
-        let mut command = Command::new(match &config.command {
+        let executable_file = match &config.command {
             Some(executable) => executable.clone(),
-            None => runtime_dir.join("main"),
-        });
+            None => PathBuf::from("/main"),
+        };
+        let mut command = Command::new(&executable_file);
         let args: Vec<_> = config
             .args
             .clone()
             .unwrap_or_default()
             .iter()
-            .map(|s| arguments_map(s.clone(), &runtime_dir))
+            .map(|arg| match arg.as_str() {
+                "$EXECUTABLE_FILE" => executable_file.clone().into_os_string(),
+                "$INPUT_FILE" => runtime_dir.input_file().into_os_string(),
+                "$OUTPUT_FILE" => runtime_dir.output_file().into_os_string(),
+                _ => OsString::from(arg),
+            })
             .collect();
         command.args(args).env_clear().current_dir(&runtime_dir);
 
@@ -36,6 +42,7 @@ impl Runner {
             .memory_controller(true)
             .build()?;
         command.cgroup(cgroups_context.clone());
+        command.chroot(runtime_dir);
 
         dbg!(&cgroups_context);
         let res = Runner {
@@ -64,15 +71,6 @@ impl Runner {
     pub fn spawn(&mut self) -> io::Result<Program> {
         let child = self.inner.spawn()?;
         Ok(Program::new(child, self.cg.clone()))
-    }
-}
-
-fn arguments_map(arg: String, runtime_dir: &RuntimeDir) -> OsString {
-    match arg.as_str() {
-        "$EXECUTABLE_FILE" => PathBuf::from("/main").into_os_string(),
-        "$INPUT_FILE" => runtime_dir.input_file().into_os_string(),
-        "$OUTPUT_FILE" => runtime_dir.output_file().into_os_string(),
-        _ => OsString::from(arg),
     }
 }
 
