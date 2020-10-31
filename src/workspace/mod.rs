@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 pub use {
     build::BuildDir,
     problem::ProblemDir,
-    runtime::{RunnerConfig, RuntimeDir},
+    runtime::{RunnerConfig, RuntimeDir, RuntimeHolder},
 };
 
 pub struct Workspace {
@@ -27,13 +27,13 @@ impl Workspace {
     pub fn from_path<P: AsRef<Path>>(dir: P) -> io::Result<Workspace> {
         let dir = dir.as_ref();
 
-        let build_dir = BuildDir::from_path(dir.join("build"))?;
-        let runtime_dir = RuntimeDir::from_path(dir.join("runtime"));
-        let problem_dir = ProblemDir::from_path(dir.join("problem"))?;
-
         let config_file = dir.join("config.toml");
         let toml_config = fs::read(config_file)?;
         let config: Config = toml::from_slice(&toml_config)?;
+        
+        let build_dir = BuildDir::from_path(dir.join("build"))?;
+        let runtime_dir = RuntimeDir::from_path(dir.join("runtime"));
+        let problem_dir = ProblemDir::from_path(dir.join("problem"))?;
 
         let res = Workspace {
             inner: PathBuf::from(dir),

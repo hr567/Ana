@@ -11,10 +11,14 @@ use crate::workspace::{RunnerConfig, RuntimeDir};
 pub struct Runner {
     inner: Command,
     cg: cgroup::Context,
+    proc_path: Option<PathBuf>,
 }
 
 impl Runner {
     pub fn new(runtime_dir: &RuntimeDir, config: &RunnerConfig) -> io::Result<Runner> {
+        let mut with_proc = false;
+        let mut proc_path = None;
+
         let executable_file = match &config.command {
             Some(executable) => executable.clone(),
             None => PathBuf::from("/main"),
@@ -34,6 +38,11 @@ impl Runner {
             .collect();
         command.args(args).env_clear().current_dir(&runtime_dir);
 
+        if let Some(rootfs_config) = config.rootfs.as_ref() {
+            with_proc = rootfs_config.with_proc;
+        }
+
+
         // TODO: handle cgroup configurations
         // let cgroups_config = config.cgroups.unwrap_or_default();
         let cgroups_context = cgroup::Builder::new()
@@ -42,12 +51,19 @@ impl Runner {
             .memory_controller(true)
             .build()?;
         command.cgroup(cgroups_context.clone());
+        command.unshare_all_ns();
         command.chroot(runtime_dir);
+
+        if with_proc {
+            command.with_proc();
+            proc_path = Some(runtime_dir.join("proc"));
+        }
 
         dbg!(&cgroups_context);
         let res = Runner {
             inner: command,
             cg: cgroups_context,
+            proc_path: proc_path
         };
 
         Ok(res)
@@ -70,18 +86,19 @@ impl Runner {
 
     pub fn spawn(&mut self) -> io::Result<Program> {
         let child = self.inner.spawn()?;
-        Ok(Program::new(child, self.cg.clone()))
+        Ok(Program::new(child, self.cg.clone(), self.proc_path.clone()))
     }
 }
 
 pub struct Program {
     inner: Child,
     cg: cgroup::Context,
+    proc_path: Option<PathBuf>,
 }
 
 impl Program {
-    fn new(inner: Child, cg: cgroup::Context) -> Program {
-        Program { inner, cg }
+    fn new(inner: Child, cg: cgroup::Context, proc_path: Option<PathBuf>) -> Program {
+        Program { inner, cg, proc_path }
     }
 
     pub fn get_resource_usage(&self) -> io::Result<(usize, Duration)> {
@@ -104,6 +121,12 @@ impl Drop for Program {
         unsafe {
             if let Err(e) = self.cg.remove() {
                 log::debug!("Error when dropping cgroup {}", e);
+            }
+
+            if let Some(path) = self.proc_path.as_ref() {
+                if let Err(e) = nix::mount::umount(path) {
+                    log::debug!("Error when umount proc filesystem {}, {}", path.display(), e);
+                }
             }
         }
     }
