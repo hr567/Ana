@@ -16,6 +16,7 @@ use crate::workspace::{
     build::BuildDir,
     problem::{ProblemType, ResourceLimit},
     Workspace,
+    runtime::RuntimeHolder
 };
 
 #[derive(Debug)]
@@ -96,6 +97,18 @@ pub async fn judge(
     );
 
     log::debug!(
+        "Create runtime folder {}",
+        workspace.build_dir().display()
+    );
+
+
+    // hold runtime folder
+    let runtime_holder = RuntimeHolder::new(
+        workspace.runtime_dir(), 
+        workspace.config().runner.rootfs.as_ref()
+    )?;
+
+    log::debug!(
         "Start move compiled file to runtime directory {}",
         workspace.runtime_dir().display()
     );
@@ -105,6 +118,10 @@ pub async fn judge(
             src.strip_prefix(workspace.build_dir().target_dir())
                 .unwrap(),
         );
+        // skip directory
+        if src.is_dir() {
+            continue;
+        }
         fs::copy(src, dst).await?;
     }
     log::debug!(
@@ -284,6 +301,8 @@ pub async fn judge(
         ProblemType::Interactive => unimplemented!("TODO: Interactive support"),
     }
 
+    // depress unsed variable warning
+    drop(runtime_holder);
     Ok(())
 }
 

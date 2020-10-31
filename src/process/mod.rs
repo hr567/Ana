@@ -23,6 +23,8 @@ pub trait CommandExt {
 
     /// Chroot to a new path before exec.
     fn chroot<P: AsRef<Path>>(&mut self, new_root: P) -> &mut Command;
+
+    fn with_proc(&mut self) -> &mut Command;
 }
 
 impl CommandExt for Command {
@@ -32,15 +34,12 @@ impl CommandExt for Command {
                 nix::sched::unshare(
                     nix::sched::CloneFlags::empty()
                         | nix::sched::CloneFlags::CLONE_FILES
-                        | nix::sched::CloneFlags::CLONE_FS
-                        | nix::sched::CloneFlags::CLONE_NEWCGROUP
                         | nix::sched::CloneFlags::CLONE_NEWIPC
                         | nix::sched::CloneFlags::CLONE_NEWNET
                         | nix::sched::CloneFlags::CLONE_NEWNS
                         | nix::sched::CloneFlags::CLONE_NEWPID
-                        | nix::sched::CloneFlags::CLONE_NEWUSER
+                        // | nix::sched::CloneFlags::CLONE_NEWUSER
                         | nix::sched::CloneFlags::CLONE_NEWUTS
-                        | nix::sched::CloneFlags::CLONE_SYSVSEM,
                 )
                 .expect("Failed to unshare namespace");
                 Ok(())
@@ -55,6 +54,23 @@ impl CommandExt for Command {
             self.pre_exec(move || {
                 nix::unistd::chroot(&new_root).expect("Failed to chroot to new path");
                 nix::unistd::chdir("/").expect("Failed to chdir to new root");
+                Ok(())
+            });
+        }
+        self
+    }
+
+    fn with_proc(&mut self) -> &mut Command {
+        unsafe {
+            let flags = nix::mount::MsFlags::empty();// | nix::mount::MsFlags::MS_PRIVATE | nix::mount::MsFlags::MS_REC;
+            self.pre_exec(move || {
+                nix::mount::mount(
+                    Some("proc"),
+                    "/proc",
+                    Some("proc"),
+                    flags,
+                    Option::<&str>::None
+                ).expect("Failed to mount proc filesystem!");
                 Ok(())
             });
         }
