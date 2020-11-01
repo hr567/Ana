@@ -166,6 +166,7 @@ pub async fn judge(
                     }
                 };
                 log::debug!("Generate the process report of {}", runtime_dir.display());
+                dbg!(&resource_usage);
 
                 let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
                     ResultType::MemoryLimitExceeded
@@ -266,6 +267,8 @@ pub async fn judge(
                     }
                 };
                 log::debug!("Generate the process report of {}", runtime_dir.display());
+                dbg!(&resource_usage);
+
 
                 let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
                     ResultType::MemoryLimitExceeded
