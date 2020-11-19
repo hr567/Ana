@@ -21,6 +21,7 @@ async fn test_normal_c() -> io::Result<()> {
 
 #[tokio::test]
 async fn test_spj_c() -> io::Result<()> {
+    env_logger::init();
     const EXAMPLE_WORKSPACE: &str = "examples/workspace/spj_c";
     let workspace = tempfile::tempdir()?;
     copy_dir(EXAMPLE_WORKSPACE, workspace.path())?;

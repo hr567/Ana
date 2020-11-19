@@ -42,7 +42,6 @@ impl Runner {
             with_proc = rootfs_config.with_proc;
         }
 
-
         // TODO: handle cgroup configurations
         // let cgroups_config = config.cgroups.unwrap_or_default();
         let cgroups_context = cgroup::Builder::new()
@@ -63,7 +62,7 @@ impl Runner {
         let res = Runner {
             inner: command,
             cg: cgroups_context,
-            proc_path: proc_path
+            proc_path: proc_path,
         };
 
         Ok(res)
@@ -98,7 +97,11 @@ pub struct Program {
 
 impl Program {
     fn new(inner: Child, cg: cgroup::Context, proc_path: Option<PathBuf>) -> Program {
-        Program { inner, cg, proc_path }
+        Program {
+            inner,
+            cg,
+            proc_path,
+        }
     }
 
     pub fn get_resource_usage(&self) -> io::Result<(usize, Duration)> {
@@ -125,7 +128,11 @@ impl Drop for Program {
 
             if let Some(path) = self.proc_path.as_ref() {
                 if let Err(e) = nix::mount::umount(path) {
-                    log::debug!("Error when umount proc filesystem {}, {}", path.display(), e);
+                    log::debug!(
+                        "Error when umount proc filesystem {}, {}",
+                        path.display(),
+                        e
+                    );
                 }
             }
         }
