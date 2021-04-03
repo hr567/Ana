@@ -5,8 +5,7 @@ use std::marker::Unpin;
 use std::path::Path;
 
 use tokio::fs::File;
-use tokio::io::{AsyncBufRead, BufReader};
-use tokio::prelude::*;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, BufReader};
 
 pub struct Comparer {
     ignore_white_space_at_eol: bool,
