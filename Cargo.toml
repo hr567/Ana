@@ -33,7 +33,7 @@ bincode = "1.1.4"
 toml = "0.5.5"
 
 # RPC requirement
-tonic = "0.4.1"
+tonic = "0.4.2"
 prost = "0.7.0"
 prost-types = "0.7.0"
 
