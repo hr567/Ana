@@ -6,6 +6,7 @@ RUN apt-get update && \
     libseccomp-dev && \
     apt-get clean && \
     cd Ana && \
+    rustup component add rustfmt && \
     cargo build --release
 
 FROM ubuntu:18.04
