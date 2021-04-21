@@ -111,7 +111,7 @@ impl rpc::ana_server::Ana for RpcServer {
         let workspace = match Workspace::from_path(path) {
             Ok(workspace) => workspace,
             Err(e) => {
-                return Err(Status::unavailable(format!(
+                return Err(Status::internal(format!(
                     "failed to generate workspace at {}",
                     e
                 )))
