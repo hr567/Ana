@@ -5,7 +5,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::process;
 
 use async_trait::async_trait;
-use futures::executor;
+inuse futures::executor;
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use tokio::runtime::{self, Runtime};
