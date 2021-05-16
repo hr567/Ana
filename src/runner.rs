@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::io;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, Stdio, ChildStderr};
 use std::time::Duration;
 use std::collections::BTreeMap;
 
@@ -119,6 +119,10 @@ impl Program {
             },
         );
         Ok(res)
+    }
+
+    pub fn stderr(&mut self) -> Option<&mut ChildStderr> {
+        self.inner.stderr.as_mut()
     }
 }
 
