@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
+use std::collections::BTreeMap;
 
 use nix;
 use serde::{Deserialize, Serialize};
@@ -146,6 +147,7 @@ pub struct RunnerConfig {
     pub seccomp: Option<SeccompConfig>,
     pub namespaces: Option<Vec<Namespace>>,
     pub rootfs: Option<RootfsConfig>,
+    pub envs: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

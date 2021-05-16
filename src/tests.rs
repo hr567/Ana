@@ -9,8 +9,11 @@ use tokio::sync::mpsc;
 use crate::judge::{judge, ResultType};
 use crate::workspace::Workspace;
 
+use env_logger;
+
 #[tokio::test]
 async fn test_normal_c() -> io::Result<()> {
+    env_logger::init();
     const EXAMPLE_WORKSPACE: &str = "examples/workspace/normal_c";
     let workspace = tempfile::tempdir()?;
     copy_dir(EXAMPLE_WORKSPACE, workspace.path())?;
