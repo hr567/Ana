@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io;
+use std::io::Read;
 use std::os::unix::fs as unix_fs;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -161,8 +162,11 @@ pub async fn judge(
                         real_time,
                     }
                 };
-                log::debug!("Generate the process report of {}", runtime_dir.display());
-                dbg!(&resource_usage);
+
+                let stderr = child.stderr();
+                log::debug!("Generate the process report of {}, {:?}", runtime_dir.display(), &resource_usage);
+
+                let mut message = String::new();
 
                 let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
                     ResultType::MemoryLimitExceeded
@@ -171,6 +175,11 @@ pub async fn judge(
                 {
                     ResultType::TimeLimitExceeded
                 } else if !exit_status.success() {
+                    let mut buffer = vec![0; 1024];
+                    if let Some(out) = stderr {
+                        out.read(buffer.as_mut()); 
+                        message = String::from_utf8_lossy(buffer.as_slice()).to_string();
+                    }
                     ResultType::RuntimeError
                 } else if Comparer::new(
                     problem_dir
@@ -193,7 +202,7 @@ pub async fn judge(
                 let res = Report {
                     result: result_type,
                     usage: Some(resource_usage),
-                    message: String::new(),
+                    message,
                 };
                 if reporter.send(res).is_err() {
                     return Err(broken_channel());

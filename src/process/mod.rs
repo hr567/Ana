@@ -37,7 +37,7 @@ impl CommandExt for Command {
                         | nix::sched::CloneFlags::CLONE_NEWIPC
                         | nix::sched::CloneFlags::CLONE_NEWNET
                         | nix::sched::CloneFlags::CLONE_NEWNS
-                        | nix::sched::CloneFlags::CLONE_NEWPID
+                        // | nix::sched::CloneFlags::CLONE_NEWPID
                         // | nix::sched::CloneFlags::CLONE_NEWUSER
                         | nix::sched::CloneFlags::CLONE_NEWUTS,
                 )

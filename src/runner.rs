@@ -2,8 +2,9 @@ use std::ffi::OsString;
 use std::io;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, Stdio, ChildStderr};
 use std::time::Duration;
+use std::collections::BTreeMap;
 
 use crate::process::{cgroup, cgroup::CommandExt as _, CommandExt as _};
 use crate::workspace::{RunnerConfig, RuntimeDir};
@@ -36,7 +37,12 @@ impl Runner {
                 _ => OsString::from(arg),
             })
             .collect();
-        command.args(args).env_clear().current_dir(&runtime_dir);
+        let empty_envs = BTreeMap::new();
+        command
+            .args(args)
+            .env_clear()
+            .envs(config.envs.as_ref().unwrap_or(&empty_envs))
+            .current_dir(&runtime_dir);
 
         if let Some(rootfs_config) = config.rootfs.as_ref() {
             with_proc = rootfs_config.with_proc;
@@ -116,6 +122,10 @@ impl Program {
             },
         );
         Ok(res)
+    }
+
+    pub fn stderr(&mut self) -> Option<&mut ChildStderr> {
+        self.inner.stderr.as_mut()
     }
 }
 
