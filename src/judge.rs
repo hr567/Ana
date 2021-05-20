@@ -16,8 +16,8 @@ use crate::runner::Runner;
 use crate::workspace::{
     build::BuildDir,
     problem::{ProblemType, ResourceLimit},
+    runtime::RuntimeHolder,
     Workspace,
-    runtime::RuntimeHolder
 };
 
 #[derive(Debug)]
@@ -97,16 +97,12 @@ pub async fn judge(
         workspace.build_dir().display()
     );
 
-    log::debug!(
-        "Create runtime folder {}",
-        workspace.build_dir().display()
-    );
-
+    log::debug!("Create runtime folder {}", workspace.build_dir().display());
 
     // hold runtime folder
     let runtime_holder = RuntimeHolder::new(
-        workspace.runtime_dir(), 
-        workspace.config().runner.rootfs.as_ref()
+        workspace.runtime_dir(),
+        workspace.config().runner.rootfs.as_ref(),
     )?;
 
     log::debug!(
@@ -166,6 +162,7 @@ pub async fn judge(
                         real_time,
                     }
                 };
+
                 let stderr = child.stderr();
                 log::debug!("Generate the process report of {}, {:?}", runtime_dir.display(), &resource_usage);
 
@@ -275,6 +272,7 @@ pub async fn judge(
                     }
                 };
                 log::debug!("Generate the process report of {}", runtime_dir.display());
+                dbg!(&resource_usage);
 
                 let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
                     ResultType::MemoryLimitExceeded

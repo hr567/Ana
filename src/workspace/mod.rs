@@ -30,7 +30,7 @@ impl Workspace {
         let config_file = dir.join("config.toml");
         let toml_config = fs::read(config_file)?;
         let config: Config = toml::from_slice(&toml_config)?;
-        
+
         let build_dir = BuildDir::from_path(dir.join("build"))?;
         let runtime_dir = RuntimeDir::from_path(dir.join("runtime"));
         let problem_dir = ProblemDir::from_path(dir.join("problem"))?;

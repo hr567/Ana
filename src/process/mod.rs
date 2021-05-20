@@ -39,7 +39,7 @@ impl CommandExt for Command {
                         | nix::sched::CloneFlags::CLONE_NEWNS
                         // | nix::sched::CloneFlags::CLONE_NEWPID
                         // | nix::sched::CloneFlags::CLONE_NEWUSER
-                        | nix::sched::CloneFlags::CLONE_NEWUTS
+                        | nix::sched::CloneFlags::CLONE_NEWUTS,
                 )
                 .expect("Failed to unshare namespace");
                 Ok(())
@@ -62,15 +62,16 @@ impl CommandExt for Command {
 
     fn with_proc(&mut self) -> &mut Command {
         unsafe {
-            let flags = nix::mount::MsFlags::empty();// | nix::mount::MsFlags::MS_PRIVATE | nix::mount::MsFlags::MS_REC;
+            let flags = nix::mount::MsFlags::empty(); // | nix::mount::MsFlags::MS_PRIVATE | nix::mount::MsFlags::MS_REC;
             self.pre_exec(move || {
                 nix::mount::mount(
                     Some("proc"),
                     "/proc",
                     Some("proc"),
                     flags,
-                    Option::<&str>::None
-                ).expect("Failed to mount proc filesystem!");
+                    Option::<&str>::None,
+                )
+                .expect("Failed to mount proc filesystem!");
                 Ok(())
             });
         }

@@ -11,6 +11,7 @@ use lazy_static::lazy_static;
 use tokio::runtime::{self, Runtime};
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 use tokio::sync::RwLock;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
@@ -71,9 +72,8 @@ pub struct RpcServer {
 
 impl RpcServer {
     pub fn new(max_threads: usize) -> RpcServer {
-        let runtime = runtime::Builder::new()
-            .threaded_scheduler()
-            .core_threads(max_threads)
+        let runtime = runtime::Builder::new_multi_thread()
+            .worker_threads(max_threads)
             .enable_all()
             .build()
             .expect("Failed to create a runtime");
@@ -111,7 +111,7 @@ impl rpc::ana_server::Ana for RpcServer {
         let workspace = match Workspace::from_path(path) {
             Ok(workspace) => workspace,
             Err(e) => {
-                return Err(Status::unavailable(format!(
+                return Err(Status::internal(format!(
                     "failed to generate workspace at {}",
                     e
                 )))
@@ -127,7 +127,10 @@ impl rpc::ana_server::Ana for RpcServer {
                 });
             }
         });
-        REGISTER.register(id, rx.map(rpc::Report::from)).await;
+
+        REGISTER
+            .register(id, UnboundedReceiverStream::new(rx).map(rpc::Report::from))
+            .await;
         Ok(Response::new(()))
     }
 

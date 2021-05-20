@@ -3,8 +3,8 @@ use std::io;
 use std::path::Path;
 
 use tempfile;
-use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
+use tokio_stream::{wrappers::UnboundedReceiverStream, StreamExt};
 
 use crate::judge::{judge, ResultType};
 use crate::workspace::Workspace;
@@ -24,6 +24,7 @@ async fn test_normal_c() -> io::Result<()> {
 
 #[tokio::test]
 async fn test_spj_c() -> io::Result<()> {
+    env_logger::init();
     const EXAMPLE_WORKSPACE: &str = "examples/workspace/spj_c";
     let workspace = tempfile::tempdir()?;
     copy_dir(EXAMPLE_WORKSPACE, workspace.path())?;
@@ -62,9 +63,11 @@ fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> io::Result<()> {
 }
 
 async fn test_workspace(workspace: Workspace) -> io::Result<()> {
-    let (tx, mut rx) = mpsc::unbounded_channel();
+    let (tx, rx) = mpsc::unbounded_channel();
     judge(workspace, tx).await?;
-    let res = rx.all(|report| report.result == ResultType::Accepted).await;
+    let res = UnboundedReceiverStream::new(rx)
+        .all(|report| report.result == ResultType::Accepted)
+        .await;
     assert!(res);
     Ok(())
 }
