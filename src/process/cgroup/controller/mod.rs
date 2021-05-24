@@ -1,12 +1,13 @@
 mod cpu;
 mod cpuacct;
 mod memory;
+mod cpuset;
 
 use std::io;
 
 use super::*;
 
-pub use self::{cpu::*, cpuacct::*, memory::*};
+pub use self::{cpu::*, cpuacct::*, memory::*, cpuset::*};
 
 /// Cgroup controller trait.
 ///

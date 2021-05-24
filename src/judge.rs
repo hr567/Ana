@@ -27,7 +27,7 @@ pub struct Report {
     pub message: String,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum ResultType {
     Accepted,
     WrongAnswer,
@@ -142,7 +142,7 @@ pub async fn judge(
                 log::debug!("Symlink the input file {}", case.input_file().display());
                 unix_fs::symlink(case.input_file(), runtime_dir.input_file())?;
                 log::debug!("Run the program in {}", runtime_dir.display());
-                let mut child = Runner::new(&runtime_dir, runner_config)?
+                let mut child = Runner::new(&runtime_dir, runner_config).await?
                     .stdin(File::open(runtime_dir.input_file())?)
                     .stdout(File::create(runtime_dir.output_file())?)
                     .stderr(Stdio::piped())
@@ -168,10 +168,18 @@ pub async fn judge(
 
                 let mut message = String::new();
 
-                let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
+                // java or any other jvm based language luckily have the bonus
+                let cpu_time_limit = problem_dir
+                    .config()
+                    .limit.cpu_time
+                    .mul_f64(
+                        runner_config.time_limit_ratio.unwrap_or(1.0)
+                    );
+                let mem_limit = (problem_dir.config().limit.memory as f64 * runner_config.mem_limit_ratio.unwrap_or(1.0)) as usize;
+
+                let result_type = if resource_usage.memory >= mem_limit {
                     ResultType::MemoryLimitExceeded
-                } else if resource_usage.real_time > problem_dir.config().limit.real_time
-                    || resource_usage.cpu_time > problem_dir.config().limit.cpu_time
+                } else if resource_usage.cpu_time > cpu_time_limit
                 {
                     ResultType::TimeLimitExceeded
                 } else if !exit_status.success() {
@@ -200,12 +208,15 @@ pub async fn judge(
                 };
 
                 let res = Report {
-                    result: result_type,
+                    result: result_type.clone(),
                     usage: Some(resource_usage),
                     message,
                 };
                 if reporter.send(res).is_err() {
                     return Err(broken_channel());
+                }
+                if result_type != ResultType::Accepted {
+                    break;
                 }
             }
         }
@@ -251,7 +262,7 @@ pub async fn judge(
                 log::debug!("Symlink the input file {}", case.input_file().display());
                 unix_fs::symlink(case.input_file(), runtime_dir.input_file())?;
                 log::debug!("Run the program in {}", runtime_dir.display());
-                let mut child = Runner::new(&runtime_dir, runner_config)?
+                let mut child = Runner::new(&runtime_dir, runner_config).await?
                     .stdin(File::open(runtime_dir.input_file())?)
                     .stdout(File::create(runtime_dir.output_file())?)
                     .stderr(Stdio::piped())
@@ -274,10 +285,18 @@ pub async fn judge(
                 log::debug!("Generate the process report of {}", runtime_dir.display());
                 dbg!(&resource_usage);
 
-                let result_type = if resource_usage.memory >= problem_dir.config().limit.memory {
+                // java or any other jvm based language luckily have the bonus
+                let cpu_time_limit = problem_dir
+                    .config()
+                    .limit.cpu_time
+                    .mul_f64(
+                        runner_config.time_limit_ratio.unwrap_or(1.0)
+                    );
+                let mem_limit = (problem_dir.config().limit.memory as f64 * runner_config.mem_limit_ratio.unwrap_or(1.0)) as usize;
+
+                let result_type = if resource_usage.memory >= mem_limit {
                     ResultType::MemoryLimitExceeded
-                } else if resource_usage.real_time > problem_dir.config().limit.real_time
-                    || resource_usage.cpu_time > problem_dir.config().limit.cpu_time
+                } else if resource_usage.cpu_time > cpu_time_limit
                 {
                     ResultType::TimeLimitExceeded
                 } else if !exit_status.success() {
@@ -296,18 +315,20 @@ pub async fn judge(
                 };
 
                 let res = Report {
-                    result: result_type,
+                    result: result_type.clone(),
                     usage: Some(resource_usage),
                     message: String::new(),
                 };
                 if reporter.send(res).is_err() {
                     return Err(broken_channel());
                 }
+                if result_type != ResultType::Accepted {
+                    break
+                }
             }
         }
         ProblemType::Interactive => unimplemented!("TODO: Interactive support"),
     }
-
     // depress unsed variable warning
     drop(runtime_holder);
     Ok(())

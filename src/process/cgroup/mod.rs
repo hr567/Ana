@@ -9,6 +9,7 @@ use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
+use std::sync::Arc;
 
 use nix::unistd::Pid;
 use rand;
@@ -25,7 +26,10 @@ pub struct Context {
     name: String,
     cpu_controller_enable: bool,
     cpuacct_controller_enable: bool,
+    cpuset_controller_enable: bool,
     memory_controller_enable: bool,
+    // cpuset_controller need to be holded by Context, which maintain the allocated cpu
+    cpuset_data: Option<Arc<CpusetData>>,
 }
 
 impl Context {
@@ -46,6 +50,17 @@ impl Context {
     pub fn cpuacct_controller(&self) -> Option<CpuAcctController<PathBuf>> {
         if self.cpuacct_controller_enable {
             Some(CpuAcctController::from_ctx(&self))
+        } else {
+            None
+        }
+    }
+
+    /// Get the cpuset controller.
+    ///
+    /// Return `None` if the controller has not been initialized. 
+    pub fn cpuset_controller(&self) -> Option<CpusetController<PathBuf>> {
+        if self.cpuset_controller_enable {
+            Some(CpusetController::from_ctx(&self))
         } else {
             None
         }
@@ -104,7 +119,25 @@ impl Context {
         if let Some(controller) = self.memory_controller() {
             res.push(Box::new(controller));
         }
+        if let Some(controller) = self.cpuset_controller() {
+            res.push(Box::new(controller));
+        }
         res
+    }
+}
+
+/// Cgroup Context Holder: hold the context lifetime
+pub struct ContextHolder {
+    pub cg: Context,
+}
+
+impl Drop for ContextHolder {
+    fn drop(&mut self) {
+        unsafe {
+            if let Err(e) = self.cg.remove() {
+                log::debug!("Error when dropping cgroup {}", e);
+            }
+        }
     }
 }
 
@@ -114,6 +147,8 @@ pub struct Builder {
     cpu_controller: bool,
     cpuacct_controller: bool,
     memory_controller: bool,
+    cpuset_controller: bool,
+    cpuset_num: u32,
 }
 
 impl Builder {
@@ -135,13 +170,20 @@ impl Builder {
         self.cpuacct_controller = flag;
         self
     }
+    
+    // TODO: implement cpuset allocate by numa align
+    pub fn cpuset_controller(mut self, flag: bool, num_of_cpu: u32) -> Builder {
+        self.cpuset_controller = flag;
+        self.cpuset_num = num_of_cpu;
+        self
+    }
 
     pub fn memory_controller(mut self, flag: bool) -> Builder {
         self.memory_controller = flag;
         self
     }
 
-    pub fn build(self) -> io::Result<Context> {
+    pub async fn build(self) -> io::Result<Context> {
         let name = match self.name {
             Some(name) => name,
             None => {
@@ -154,11 +196,13 @@ impl Builder {
             }
         };
 
-        let ctx = Context {
+        let mut ctx = Context {
             name,
             cpu_controller_enable: self.cpu_controller,
             cpuacct_controller_enable: self.cpuacct_controller,
+            cpuset_controller_enable: self.cpuset_controller,
             memory_controller_enable: self.memory_controller,
+            cpuset_data: None,
         };
 
         if self.cpu_controller {
@@ -176,6 +220,14 @@ impl Builder {
             controller.initialize()?
         }
 
+        if self.cpuset_controller {
+            let mut controller = CpusetController::from_ctx(&ctx);
+            controller.initialize()?;
+            ctx.cpuset_data = Some(
+                controller.allocate(self.cpuset_num).await?
+            );
+        }
+
         Ok(ctx)
     }
 }
@@ -187,6 +239,8 @@ impl Default for Builder {
             cpu_controller: true,
             cpuacct_controller: true,
             memory_controller: true,
+            cpuset_controller: false,
+            cpuset_num: 0
         }
     }
 }

@@ -23,6 +23,7 @@ tokio-stream = "0.1.5"
 rand = "0.8.3"
 nix = "0.20.0"
 tempfile = "3.2.0"
+num_cpus = "1.13.0"
 
 # Command line interface
 clap = { version = "2.33.3", features = ["suggestions", "color"] }

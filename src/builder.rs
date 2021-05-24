@@ -8,6 +8,8 @@ use std::time::Duration;
 use crate::language::Language;
 use crate::process::ChildExt;
 use crate::workspace::BuildDir;
+use crate::process::cgroup;
+use crate::process::cgroup::CommandExt;
 
 #[derive(Debug)]
 pub struct Builder {
@@ -56,6 +58,17 @@ impl Builder {
             fs::create_dir(&self.target_dir)?;
         }
         fs::set_permissions(&self.script, Permissions::from_mode(0o700))?;
+        let cg_ctx = cgroup::Builder::new()
+            .cpu_controller(true)
+            .cpuacct_controller(true)
+            .memory_controller(true)
+            .cpuset_controller(true, 1)
+            .build()
+            .await?;
+        #[warn(unused_variables)]
+        let cg_holder = cgroup::ContextHolder {
+            cg: cg_ctx.clone(),
+        };
         let res = Command::new("/bin/sh")
             .arg("-c")
             .arg(&self.script)
@@ -68,6 +81,7 @@ impl Builder {
             .env("EXECUTABLE_FILE", &self.executable_file)
             .env("TARGET_DIR", &self.target_dir)
             .current_dir(&self.build_dir)
+            .cgroup(cg_ctx)
             .spawn()?;
         let res = match self.timeout {
             Some(timeout) => res.timeout_with_output(timeout)?,

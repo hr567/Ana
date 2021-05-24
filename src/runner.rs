@@ -16,7 +16,7 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(runtime_dir: &RuntimeDir, config: &RunnerConfig) -> io::Result<Runner> {
+    pub async fn new(runtime_dir: &RuntimeDir, config: &RunnerConfig) -> io::Result<Runner> {
         let mut with_proc = false;
         let mut proc_path = None;
 
@@ -54,7 +54,9 @@ impl Runner {
             .cpu_controller(true)
             .cpuacct_controller(true)
             .memory_controller(true)
-            .build()?;
+            .cpuset_controller(true, 1)
+            .build()
+            .await?;
         command.cgroup(cgroups_context.clone());
         command.unshare_all_ns();
         command.chroot(runtime_dir);

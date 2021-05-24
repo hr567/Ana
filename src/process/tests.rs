@@ -41,7 +41,7 @@ macro_rules! timeout_input_file {
 
 macro_rules! cg_ctx {
     () => {{
-        let cg_ctx = cgroup::Builder::new().build()?;
+        let cg_ctx = cgroup::Builder::new().build().await?;
 
         let cpu_controller = cg_ctx.cpu_controller().unwrap();
         let memory_controller = cg_ctx.memory_controller().unwrap();
@@ -66,8 +66,8 @@ macro_rules! cg_ctx {
     }};
 }
 
-#[test]
-fn test_cgroup() -> io::Result<()> {
+#[tokio::test]
+async fn test_cgroup() -> io::Result<()> {
     let input_file = input_file!();
     let output_file = output_file!();
     let cg_ctx = cg_ctx!();

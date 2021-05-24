@@ -167,6 +167,8 @@ pub struct RunnerConfig {
     pub namespaces: Option<Vec<Namespace>>,
     pub rootfs: Option<RootfsConfig>,
     pub envs: Option<BTreeMap<String, String>>,
+    pub time_limit_ratio: Option<f64>,
+    pub mem_limit_ratio: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -3,9 +3,9 @@ use super::*;
 use std::iter::FromIterator;
 use std::time::Duration;
 
-#[test]
-fn test_cgroup_path() -> io::Result<()> {
-    let ctx = Builder::new().build()?;
+#[tokio::test]
+async fn test_cgroup_path() -> io::Result<()> {
+    let ctx = Builder::new().build().await?;
     let cpu_controller = ctx.cpu_controller().unwrap();
     let cpu_path = cpu_controller.as_ref();
     assert!(cpu_path.exists());
@@ -33,9 +33,9 @@ fn test_cgroup_path() -> io::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_cpu_controller() -> io::Result<()> {
-    let ctx = Builder::new().build()?;
+#[tokio::test]
+async fn test_cpu_controller() -> io::Result<()> {
+    let ctx = Builder::new().build().await?;
 
     let cpu_controller = ctx.cpu_controller().unwrap();
 
@@ -52,9 +52,9 @@ fn test_cpu_controller() -> io::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_cpuacct_controller() -> io::Result<()> {
-    let ctx = Builder::new().build()?;
+#[tokio::test]
+async fn test_cpuacct_controller() -> io::Result<()> {
+    let ctx = Builder::new().build().await?;
 
     let cpuacct_controller = ctx.cpuacct_controller().unwrap();
     let cpu_usage = cpuacct_controller.usage()?;
@@ -63,9 +63,24 @@ fn test_cpuacct_controller() -> io::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_memory_controller() -> io::Result<()> {
-    let ctx = Builder::new().build()?;
+#[tokio::test]
+async fn test_cpuset_controller() -> io::Result<()> {
+    let request = 2;
+    let ctx = Builder::new().cpuset_controller(true, request).build().await?;
+
+    let cpuset_controller = ctx.cpuset_controller().unwrap();
+    let cpuset_allocated = cpuset_controller.allocated()?;
+    let mut num = 0;
+    cpuset_allocated.iter().for_each(|(start, end)| {
+        num += end - start + 1;
+    });
+    assert_eq!(request, num);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_memory_controller() -> io::Result<()> {
+    let ctx = Builder::new().build().await?;
 
     let memory_controller = ctx.memory_controller().unwrap();
 

@@ -24,7 +24,7 @@ lazy_static! {
 }
 
 struct Register {
-    register: RwLock<HashMap<String, RwLock<UnboundedReceiver<rpc::Report>>>>,
+    register: RwLock<HashMap<String, UnboundedReceiver<rpc::Report>>>,
 }
 
 impl Register {
@@ -49,18 +49,18 @@ impl Register {
             log::warn!("the task ID {} is exist. The new one is ignored.", &id);
             return;
         }
-        register.insert(id, RwLock::new(rx));
+        register.insert(id.clone(), rx);
     }
 
     async fn get_report(&self, id: &str) -> Option<rpc::Report> {
-        let res = {
-            let register = self.register.read().await;
-            let mut rx = register.get(id)?.write().await;
-            rx.recv().await
-        };
-        if res.is_none() {
+        let mut rx = {
             let mut register = self.register.write().await;
-            register.remove(id);
+            register.remove(id)?
+        };
+        let res = rx.recv().await;
+        if res.is_some() {
+            let mut register = self.register.write().await;
+            register.insert(id.to_string(), rx);
         }
         res
     }
@@ -118,6 +118,7 @@ impl rpc::ana_server::Ana for RpcServer {
             }
         };
         let (tx, rx) = mpsc::unbounded_channel();
+        let tmp_id = id.clone();
         self.runtime.spawn(async move {
             if let Err(e) = judge::judge(workspace, tx.clone()).await {
                 let _ = tx.send(judge::Report {
