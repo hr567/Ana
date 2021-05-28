@@ -292,7 +292,7 @@ pub async fn judge(
                         runner_config.time_limit_ratio.unwrap_or(1.0)
                     );
                 let start_time = Instant::now();
-                let exit_status = child.timeout(problem_dir.config().limit.real_time)?;
+                let exit_status = child.timeout(real_time_limit)?;
                 let resource_usage = {
                     let real_time = start_time.elapsed();
                     let (memory, cpu_time) = child.get_resource_usage()?;
