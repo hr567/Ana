@@ -151,8 +151,21 @@ pub async fn judge(
                     "Wait the process and get the result {}",
                     runtime_dir.display()
                 );
+                // java or any other jvm based language luckily have the bonus
+                let cpu_time_limit = problem_dir
+                    .config()
+                    .limit.cpu_time
+                    .mul_f64(
+                        runner_config.time_limit_ratio.unwrap_or(1.0)
+                    );
+                let real_time_limit = problem_dir
+                    .config()
+                    .limit.real_time
+                    .mul_f64(
+                        runner_config.time_limit_ratio.unwrap_or(1.0)
+                    );
                 let start_time = Instant::now();
-                let exit_status = child.timeout(problem_dir.config().limit.real_time)?;
+                let exit_status = child.timeout(real_time_limit)?;
                 let resource_usage = {
                     let real_time = start_time.elapsed();
                     let (memory, cpu_time) = child.get_resource_usage()?;
@@ -168,18 +181,12 @@ pub async fn judge(
 
                 let mut message = String::new();
 
-                // java or any other jvm based language luckily have the bonus
-                let cpu_time_limit = problem_dir
-                    .config()
-                    .limit.cpu_time
-                    .mul_f64(
-                        runner_config.time_limit_ratio.unwrap_or(1.0)
-                    );
                 let mem_limit = (problem_dir.config().limit.memory as f64 * runner_config.mem_limit_ratio.unwrap_or(1.0)) as usize;
 
                 let result_type = if resource_usage.memory >= mem_limit {
                     ResultType::MemoryLimitExceeded
-                } else if resource_usage.cpu_time > cpu_time_limit
+                } else if resource_usage.cpu_time > cpu_time_limit ||
+                    resource_usage.real_time > real_time_limit
                 {
                     ResultType::TimeLimitExceeded
                 } else if !exit_status.success() {
@@ -271,6 +278,19 @@ pub async fn judge(
                     "Wait the process and get the result {}",
                     runtime_dir.display()
                 );
+                // java or any other jvm based language luckily have the bonus
+                let cpu_time_limit = problem_dir
+                    .config()
+                    .limit.cpu_time
+                    .mul_f64(
+                        runner_config.time_limit_ratio.unwrap_or(1.0)
+                    );
+                let real_time_limit = problem_dir
+                    .config()
+                    .limit.real_time
+                    .mul_f64(
+                        runner_config.time_limit_ratio.unwrap_or(1.0)
+                    );
                 let start_time = Instant::now();
                 let exit_status = child.timeout(problem_dir.config().limit.real_time)?;
                 let resource_usage = {
@@ -285,18 +305,12 @@ pub async fn judge(
                 log::debug!("Generate the process report of {}", runtime_dir.display());
                 dbg!(&resource_usage);
 
-                // java or any other jvm based language luckily have the bonus
-                let cpu_time_limit = problem_dir
-                    .config()
-                    .limit.cpu_time
-                    .mul_f64(
-                        runner_config.time_limit_ratio.unwrap_or(1.0)
-                    );
                 let mem_limit = (problem_dir.config().limit.memory as f64 * runner_config.mem_limit_ratio.unwrap_or(1.0)) as usize;
 
                 let result_type = if resource_usage.memory >= mem_limit {
                     ResultType::MemoryLimitExceeded
                 } else if resource_usage.cpu_time > cpu_time_limit
+                    || resource_usage.real_time > real_time_limit
                 {
                     ResultType::TimeLimitExceeded
                 } else if !exit_status.success() {
