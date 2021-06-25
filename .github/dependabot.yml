@@ -1,0 +1,45 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "21:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: async-trait
+    versions:
+    - 0.1.49
+    - 0.1.50
+  - dependency-name: tonic
+    versions:
+    - 0.4.2
+  - dependency-name: tonic-build
+    versions:
+    - 0.4.2
+  - dependency-name: bincode
+    versions:
+    - 1.3.3
+  - dependency-name: futures
+    versions:
+    - 0.3.12
+    - 0.3.13
+    - 0.3.14
+  - dependency-name: tokio
+    versions:
+    - 1.5.0
+  - dependency-name: bindgen
+    versions:
+    - 0.58.1
+  - dependency-name: grpcio
+    versions:
+    - 0.7.1
+    - 0.8.0
+    - 0.8.2
+  - dependency-name: nix
+    versions:
+    - 0.19.1
+    - 0.20.0
+  - dependency-name: protoc-grpcio
+    versions:
+    - 3.0.0
